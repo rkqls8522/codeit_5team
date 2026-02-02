@@ -8,7 +8,7 @@ import json as json_json
 from pathlib import Path as Path_Path
 
 
-master_dir = r".\codeit_5team\codeit_5team\data\ai-07-object-detection\sprint_ai_project1_data"
+master_dir = r"C:\Users\User1\Downloads\ai-07-object-detection\sprint_ai_project1_data"
 
 anntation_dir = os.path.join(master_dir, r"train_annotations")
 image_dir = os.path.join(master_dir, r"train_images")
@@ -85,3 +85,6 @@ if creat_flag:
             with open(txt_path, "a", encoding="utf-8") as f:
                 f.write(f"\n{id} {(x+(w/2))/img_w:.6f} {(y+(h/2))/img_h:.6f} {w/img_w:.6f} {h/img_h:.6f}")
 
+    with open(os.path.join(anntation_dir, "cat_id_to_yolo.txt"), "w", encoding="utf-8") as f:
+        for k, v in cat_id_to_yolo.items():
+            f.write(f"{k} {v}\n")

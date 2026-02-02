@@ -1,5 +1,3 @@
-# 데이터 전처리 스크립트
-
 import json as json_json
 from pathlib import Path
 from PIL import Image
@@ -34,7 +32,7 @@ validation_transforms = v2.Compose([
     v2.ToDtype(torch.float32, scale=True),
 ])
 
-###     class
+###     train,valid dataset class
 class FasterRCNNDataset(Dataset):
     def __init__(self, img_dir, annt_dir, transforms=training_transforms):
         self.img_dir = img_dir
@@ -105,3 +103,28 @@ class FasterRCNNDataset(Dataset):
             annt_list.append([img_annt_boxes, img_annt_labels])
 
         return img_p_list, annt_list
+
+###     test dataset class
+class TestDataset(Dataset):
+    def __init__(self, img_dir, transforms=training_transforms, load_exts = ("*.jpg", "*.png", "*.jpeg")):
+        self.img_dir = img_dir
+        self.transforms = transforms
+        img_p_list = []
+        for ext in load_exts:
+            img_p_list.extend(
+                glob.glob(os.path.join(img_dir, "**", ext), recursive=True)
+            )
+        self.img_p_list = img_p_list
+
+    def __len__(self):
+        return len(self.img_p_list)
+
+    def __getitem__(self, idx):
+
+        img_path = self.img_p_list[idx]
+        image = Image.open(img_path).convert("RGB")
+
+        if self.transforms:
+            image = self.transforms(image)
+
+        return image

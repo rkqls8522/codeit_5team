@@ -63,7 +63,8 @@ if creat_flag:
     cat_id_to_yolo = {
         cat_id: idx
         for idx, cat_id in enumerate(
-            sorted({annt["categories"][0]["id"] for annt in annt_list})
+            sorted({annt["categories"][0]["id"] for annt in annt_list}),
+            start=1
         )
     }
 

@@ -34,10 +34,10 @@ validation_transforms = v2.Compose([
 
 ###     train,valid dataset class
 class FasterRCNNDataset(Dataset):
-    def __init__(self, img_dir, annt_dir, cat_path, transforms=training_transforms, img_path_list_mode=False, img_path_list=[]):
+    def __init__(self, img_dir, annt_dir, class_dict, transforms=training_transforms, img_path_list_mode=False, img_path_list=[]):
         self.img_dir = img_dir
         self.annt_dir = annt_dir
-        img_p_list, annt_list = self._sorted_img_annt_path(img_dir, annt_dir, cat_path=cat_path, img_path_list_mode=img_path_list_mode, img_path_list=img_path_list)
+        img_p_list, annt_list = self._sorted_img_annt_path(img_dir, annt_dir, class_dict, img_path_list_mode=img_path_list_mode, img_path_list=img_path_list)
         self.img_p_list = img_p_list
         self.annt_list = annt_list
         self.transforms = transforms
@@ -67,7 +67,7 @@ class FasterRCNNDataset(Dataset):
         return image, target
     
     #   _sorted_img_annt_path: pair된 idx번호를 가진 img path list와 annotation list를 반환 
-    def _sorted_img_annt_path(self, img_dir, annt_dir, cat_path, load_exts = ("*.jpg", "*.png", "*.jpeg"), img_path_list_mode = False, img_path_list=[]): #   cat_path: make_classID_txt.py에서 생성한 class 매핑 txt 파일이 있는 폴더 경로
+    def _sorted_img_annt_path(self, img_dir, annt_dir, class_dict, load_exts = ("*.jpg", "*.png", "*.jpeg"), img_path_list_mode = False, img_path_list=[]): #   cat_path: make_classID_txt.py에서 생성한 class 매핑 txt 파일이 있는 폴더 경로
         
         if img_path_list_mode:
             img_p_list = img_path_list
@@ -84,14 +84,6 @@ class FasterRCNNDataset(Dataset):
         for path in annt_p_list:
             with open(path, "r", encoding="utf-8") as f:
                 json_list.append(json_json.load(f))
-        
-        cat_id = {}
-        with open(os.path.join(cat_path), "r", encoding="utf-8") as f:
-            for line in f:
-                if not line.strip():
-                    continue
-                k, v = line.strip().split()
-                cat_id[int(k)] = int(v)
 
         annt_list = []
         for img_p in img_p_list:
@@ -101,7 +93,7 @@ class FasterRCNNDataset(Dataset):
                 if json["images"][0]["file_name"] == os.path.basename(img_p):
                     boxes = json["annotations"][0]["bbox"]
                     img_annt_boxes.append(boxes)
-                    img_annt_labels.append(cat_id[json["categories"][0]["id"]])
+                    img_annt_labels.append(class_dict[json["categories"][0]["id"]]["fasterrcnn_id"])
 
             annt_list.append([img_annt_boxes, img_annt_labels])
 

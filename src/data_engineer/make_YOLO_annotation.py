@@ -8,7 +8,7 @@ import json as json_json
 from pathlib import Path as Path_Path
 
 
-master_dir = r"C:\Users\User1\Downloads\ai-07-object-detection\sprint_ai_project1_data"
+master_dir = r"C:\codit_data\sprint_ai_project1_data"
 
 anntation_dir = os.path.join(master_dir, r"train_annotations")
 image_dir = os.path.join(master_dir, r"train_images")

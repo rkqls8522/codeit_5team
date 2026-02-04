@@ -19,7 +19,7 @@ def split_yolo_dataset(image_dir, anntation_dir, output_dir, val_ratio=0.2, seed
         raise ValueError("이미지 파일이 없습니다.")
 
     # train / val split
-    train_imgs, val_imgs = train_test_split(images, test_size=val_ratio, random_state=seed, shuffle=True)
+    train_imgs, val_imgs = train_test_split(images, test_size=val_ratio, random_state=seed, shuffle=shuffle)
 
     def copy_pair(img_path, split):
         label_path = anntation_dir / f"{img_path.stem}.txt"

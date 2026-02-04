@@ -7,10 +7,10 @@ import os
 class DrugDetector:     # 모델 로드 및 추론
     def __init__(self, model_path=None):
         if model_path and os.path.exists(model_path):
-            print(f"학습 모델 불러오는 중: {config.model_file}")    # config.model_file: 학습파일 경로
+            print(f"학습 모델 불러오는 중: {model_path}")    # 학습파일 경로(실제 사용하는 model_path출력)
             self.model = YOLO(model_path)
         else:
-            print(f"기본 모델 불러오는 중: {config.model_file}")
+            print(f"기본 모델 불러오는 중: {config.model_file}")    # 기본 모델 경로이기때문에 config.model_file사용
             self.model = YOLO(config.model_file)
         
         self.conf = config.conf_threshold       # 설정 값 지정 / 신뢰도 기준

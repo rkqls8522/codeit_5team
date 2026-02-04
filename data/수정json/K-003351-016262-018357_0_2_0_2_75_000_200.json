@@ -64,7 +64,7 @@
                 311,
                 315
             ],
-            "category_id": 32310,
+            "category_id": 18357,
             "ignore": 0,
             "segmentation": [],
             "id": 903,
@@ -74,8 +74,8 @@
     "categories": [
         {
             "supercategory": "pill",
-            "id": 32310,
-            "name": "글리아티린연질캡슐"
+            "id": 18357,
+            "name": "종근당글리아티린연질캡슐(콜린알포세레이트) "
         }
     ]
 }

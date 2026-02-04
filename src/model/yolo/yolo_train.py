@@ -15,7 +15,7 @@ def train(resume=False):
     model = YOLO(config.model_file)
     print("학습 시작")
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
-                epochs=15,
+                epochs=50,
                 imgsz=640,
                 device=config.device,
                 batch=16,

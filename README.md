@@ -111,37 +111,38 @@
 
 - Python 3.9 이상
 - Conda (Anaconda 또는 Miniconda)
-- CUDA 지원 GPU (권장, 필수 아님)
 
 ## 사용법 및 환경설정
 
 본 프로젝트는 Conda 가상환경을 기반으로 실행됩니다.
 
-1. 저장소 클론
+### 1. 데이터 준비
+
+프로젝트 루트의 `data/data.zip` 파일을 압축 해제합니다.
 
 ```bash
-git clone https://github.com/rkqls8522/codeit_5team
+python scripts/prepare_data.py
 ```
 
-2. Conda 가상환경 생성 및 활성화
+### 2. Conda 가상환경 생성 및 활성화
 
 ```bash
 conda env create -f env/environment.yml
 conda activate healthit_project
 ```
 
-3. 학습 실행
+### 3. 학습 실행
 
 아래 명령어로 실행합니다.
 
 ```bash
-
+python src/train.py
 
 ```
 
 학습이 완료되면 모델 가중치는 `results/final_model/`에 저장됩니다.
 
-4. 추론 실행 및 결과 시각화
+### 4. 추론 실행 및 결과 시각화
 
 학습된 모델을 사용하여 이미지 추론을 수행합니다.
 

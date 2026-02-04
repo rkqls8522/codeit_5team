@@ -12,13 +12,13 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_DIR)))
 TRAIN_RESULT_DIR = os.path.join(ROOT_DIR, 'results') 
 INFERENCE_RESULT_DIR = os.path.join(ROOT_DIR, 'results', 'figures')
 # 4. 데이터셋 경로 설정
-data_yaml_path = os.path.join(ROOT_DIR, 'data', 'data.yaml')    # data.yaml 파일 경로
+data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')     # src/model/yolo/ 경로(수정)
 
 # 5. 학습 데이터셋 경로 설정
-trained_model_path = os.path.join(TRAIN_RESULT_DIR, 'final_model', 'weights', 'best.pt')
+trained_model_path = os.path.join(TRAIN_RESULT_DIR, 'yolo_final_model', 'weights', 'best.pt')
 
 # 6. 테스트 이미지 폴더 (배치 추론용)
-test_images_dir = os.path.join(ROOT_DIR, 'data', 'test_images')
+test_images_dir = r"C:\codit_data\sprint_ai_project1_data\images\test"      # 경로 수정
 
 # 7. 제출 CSV 저장 경로
 submission_csv_path = os.path.join(INFERENCE_RESULT_DIR, 'submission.csv')
@@ -29,8 +29,8 @@ conf_threshold_submission = 0.001   # 제출용
 # 9. IoU 임계값 설정
 iou_threshold = 0.5 
 
-# 초기 모델 파일이름
-model_file = 'yolov8n.pt'
+# 초기 모델 파일이름 (현재 폴더에 위치하도록 설정)
+model_file = os.path.join(CURRENT_DIR, 'yolov8n.pt')
 
 # 임시, 테스트보기위해 하나만 지정
 test_image_path = os.path.join(ROOT_DIR, 'data', 'test_images', '54.png')

@@ -15,12 +15,12 @@ def train(resume=False):
     model = YOLO(config.model_file)
     print("학습 시작")
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
-                epochs=50,
+                epochs=15,
                 imgsz=640,
                 device=config.device,
                 batch=16,
                 project=config.TRAIN_RESULT_DIR,
-                name='final_model',
+                name='yolo_final_model',
                 exist_ok=True,
                 resume=resume)
     

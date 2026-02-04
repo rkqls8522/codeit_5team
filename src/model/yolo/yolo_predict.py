@@ -255,6 +255,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                 results = detector.detect(image, conf = conf)   # 신뢰도 기준을 낮출 수 있게 설정하였으나 변경가능예정
                 
                 for det in results:
+                    if det['class_name'] == 'background':       # background(0번 클래스)는 저장하지 않고 건너뜀
+                        continue
                     x1, y1, x2, y2 = det['bbox']
                     # x1,y1,x2,y2 → bbox_x, bbox_y, bbox_w, bbox_h 변환
                     bbox_x = x1
@@ -265,7 +267,7 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                     writer.writerow([
                         annotation_id,      # 고유번호
                         image_id,           # 이미지 번호
-                        det['category_id'], # 약 종류 번호(class_id)
+                        det['class_name'], # 약 종류 번호(class_id)
                         bbox_x,             # 왼쪽 x좌표
                         bbox_y,             # 위쪽 y좌표
                         bbox_w,             # 폭

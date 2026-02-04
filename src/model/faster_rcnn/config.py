@@ -1,6 +1,6 @@
 CONFIG = {
     # 데이터 정보 (EDA 기반)
-    'num_classes': None,  # background + 약 클래스 수 (데이터 담당 확인 후 설정)
+    'num_classes': 57,  # background(0) + 약 56 클래스 = 57
     'image_size': (976, 1280),  # (width, height), 전체 이미지 동일
     'bbox_area_range': (23250, 272435),  # 최소~최대 bbox 면적 (px²)
 

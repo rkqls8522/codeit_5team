@@ -1,3 +1,4 @@
+### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###
 # 추론 및 결과 저장 (이미지 + CSV)
 import os
 import csv

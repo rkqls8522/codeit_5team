@@ -18,7 +18,7 @@ data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')     # src/model/yolo/ �
 trained_model_path = os.path.join(TRAIN_RESULT_DIR, 'yolo_final_model', 'weights', 'best.pt')
 
 # 6. 테스트 이미지 폴더 (배치 추론용)
-test_images_dir = r"C:\codit_data\sprint_ai_project1_data\images\test"      # 경로 수정
+test_images_dir = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test')      # 경로 수정
 
 # 7. 제출 CSV 저장 경로
 submission_csv_path = os.path.join(INFERENCE_RESULT_DIR, 'submission.csv')
@@ -33,7 +33,7 @@ iou_threshold = 0.5
 model_file = os.path.join(CURRENT_DIR, 'yolov8n.pt')
 
 # 임시, 테스트보기위해 하나만 지정
-test_image_path = os.path.join(ROOT_DIR, 'data', 'test_images', '54.png')
+test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정
 
 # 민감도 설정
 # 50% 이상 확실할 때 판단 => 나중 조정 예정(임시조치)

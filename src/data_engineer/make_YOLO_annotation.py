@@ -8,7 +8,7 @@ import json as json_json
 from pathlib import Path as Path_Path
 
 
-def make_YOLO_annotation(image_dir, anntation_dir, folder_name="YOLO annotation", load_exts = ("*.jpg", "*.png", "*.jpeg")):
+def make_YOLO_annotation(image_dir, anntation_dir, class_dict, folder_name="YOLO annotation", load_exts = ("*.jpg", "*.png", "*.jpeg")):
     #   json, image 경로 설정
 
     anntation_file_path_list = glob.glob(os.path.join(anntation_dir,  "**"), recursive=True)
@@ -51,20 +51,12 @@ def make_YOLO_annotation(image_dir, anntation_dir, folder_name="YOLO annotation"
         #    annt_unq_yolo.add(cat["categories"][0]["id"])
         #    cat_id_to_yolo = {cat: idx for idx, cat in enumerate(annt_unq_yolo)}
 
-        cat_id_to_yolo = {
-            cat_id: idx
-            for idx, cat_id in enumerate(
-                sorted({annt["categories"][0]["id"] for annt in annt_list}),
-                start=1
-            )
-        }
-
         for annt in annt_list:
             file_name = os.path.splitext(annt["file_name"])[0]
             img_w = annt["image_size"][0]
             img_h = annt["image_size"][1]
 
-            id = cat_id_to_yolo[annt["categories"][0]["id"]]
+            id = class_dict[annt["categories"][0]["id"]]["yolo_id"]
             x, y, w, h = annt["annotations"][0]["bbox"]
             
             
@@ -77,8 +69,5 @@ def make_YOLO_annotation(image_dir, anntation_dir, folder_name="YOLO annotation"
                 with open(txt_path, "a", encoding="utf-8") as f:
                     f.write(f"\n{id} {(x+(w/2))/img_w:.6f} {(y+(h/2))/img_h:.6f} {w/img_w:.6f} {h/img_h:.6f}")
 
-        with open(os.path.join(anntation_dir, "cat_id_to_yolo.txt"), "w", encoding="utf-8") as f:
-            for k, v in cat_id_to_yolo.items():
-                f.write(f"{k} {v}\n")
 
     return YOLO_annt_dir

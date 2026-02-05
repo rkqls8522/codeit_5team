@@ -46,11 +46,19 @@ def train(model, train_loader, valid_loader, device, save_dir='checkpoints'):
         momentum=CONFIG['momentum'],
         weight_decay=CONFIG['weight_decay']
     )
-    lr_scheduler = torch.optim.lr_scheduler.StepLR(
-        optimizer,
-        step_size=CONFIG['lr_scheduler_step'],
-        gamma=CONFIG['lr_scheduler_gamma']
-    )
+    scheduler_type = CONFIG.get('lr_scheduler_type', 'step')
+    if scheduler_type == 'cosine':
+        lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=CONFIG['num_epochs'],
+            eta_min=1e-6
+        )
+    else:
+        lr_scheduler = torch.optim.lr_scheduler.StepLR(
+            optimizer,
+            step_size=CONFIG['lr_scheduler_step'],
+            gamma=CONFIG['lr_scheduler_gamma']
+        )
 
     best_loss = float('inf')
     train_losses = []

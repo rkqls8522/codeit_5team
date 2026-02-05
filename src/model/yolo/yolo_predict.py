@@ -266,7 +266,7 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                     writer.writerow([
                         annotation_id,      # 고유번호
                         image_id,           # 이미지 번호
-                        det['class_id'],   # 약 종류 번호(class_id)
+                        det['category_id'], # 약 종류 번호
                         bbox_x,             # 왼쪽 x좌표
                         bbox_y,             # 위쪽 y좌표
                         bbox_w,             # 폭

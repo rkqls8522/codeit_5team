@@ -5,7 +5,7 @@ from PIL import Image
 import torch
 from torch.utils.data import Dataset
 from torchvision.transforms import v2
-
+from torchvision import tv_tensors
 import numpy as np
 
 import os
@@ -50,11 +50,12 @@ class FasterRCNNDataset(Dataset):
         img_path = self.img_p_list[idx]
         image = Image.open(img_path).convert("RGB")
 
+        for annt in self.annt_list[idx][0]:
+            annt[2] = annt[0] +annt[2]
+            annt[3] = annt[1] +annt[3]
         boxes = torch.tensor(self.annt_list[idx][0], dtype=torch.float32)
         labels = torch.tensor(self.annt_list[idx][1], dtype=torch.int64)
-
-        if self.transforms:
-            image, boxes = self.transforms(image, boxes)
+        imgsize = self.annt_list[idx][2][0]
 
         target = {
             "boxes": boxes,
@@ -63,6 +64,28 @@ class FasterRCNNDataset(Dataset):
             "area": torch.abs((boxes[:, 3] - boxes[:, 1]) * (boxes[:, 2] - boxes[:, 0])),
             "iscrowd": torch.zeros((len(boxes),), dtype=torch.int64),
         }
+
+        if self.transforms:
+            if len(boxes) > 0:
+                tv_boxes = tv_tensors.BoundingBoxes(
+                    target["boxes"], 
+                    format="XYXY", 
+                    canvas_size=imgsize
+                )
+                image, tv_boxes = self.transforms(image, tv_boxes)
+                target["boxes"] = tv_boxes
+
+                boxes = target["boxes"].as_subclass(torch.Tensor)
+
+                bb0 = boxes[:, 0].clamp(min=0, max=imgsize[0])
+                bb1 = boxes[:, 1].clamp(min=0, max=imgsize[1])
+                bb2 = boxes[:, 2].clamp(min=0, max=imgsize[0])
+                bb3 = boxes[:, 3].clamp(min=0, max=imgsize[1])
+
+                area = torch.abs((bb3 - bb1) * (bb2 - bb0))
+                target["area"] = area
+            else:
+                image = self.transforms(image)
 
         return image, target
     
@@ -89,13 +112,15 @@ class FasterRCNNDataset(Dataset):
         for img_p in img_p_list:
             img_annt_boxes = []
             img_annt_labels = []
+            img_annt_imgsize = []
             for json in json_list:
                 if json["images"][0]["file_name"] == os.path.basename(img_p):
                     boxes = json["annotations"][0]["bbox"]
                     img_annt_boxes.append(boxes)
                     img_annt_labels.append(class_dict[json["categories"][0]["id"]]["fasterrcnn_id"])
+                    img_annt_imgsize.append((json["images"][0]["height"], json["images"][0]["width"]))
 
-            annt_list.append([img_annt_boxes, img_annt_labels])
+            annt_list.append([img_annt_boxes, img_annt_labels, img_annt_imgsize])
 
         return img_p_list, annt_list
 

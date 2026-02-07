@@ -1,21 +1,79 @@
 ### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###
-# =============================================================================================
+#======================================================================================
 # [모델 추론 및 결과 저장(이미지 + CSV)]
-#
 # 학습된 모델을 사용해서 이미지를 추론을 하고 결과를 이미지와 CSV파일로 저장합니다.
 # 
-#
-#
+# 1. predict_and_save() : 단일 이미지를 읽은 후 추론하고 결과 이미지와 CSV파일을 각각 저장
+# 2. predict_batch() : 많은 이미지를 한꺼번에 분석할 때 사용
+# 3. save_results_to_csv() : 추론된 결과 리스트를 실제 CSV파일로 저장
+# 4. create_submission_csv() : 서브미션 제출용 파일 만드는 함수
+# 5. get_detection_summary() : 추론 결과에서 객체별로 개수, 평균 신뢰도 등을 계산하는 함수
 # =============================================================================================
 import os
 import csv
 import re
 import cv2
+import ast  
+
 from datetime import datetime
 
 import yolo_config as config
 from yolo_detector import DrugDetector
 from yolo_utils import load_image, draw_box
+
+### ClassID 매핑 로드 함수 (공통 유틸리티)
+def load_class_id_map(class_id_path=None):
+    """
+    ClassID.txt 파일을 읽어서 YOLO class ID를 category ID로 매핑하는 딕셔너리를 반환합니다.
+    
+    Args:
+        class_id_path: ClassID.txt 파일 경로 (기본값: config.ROOT_DIR/src/data_engineer/ClassID.txt)
+    
+    Returns:
+        dict: {yolo_id: category_id} 형태의 딕셔너리
+    """
+    class_id_map = {}
+    
+    if class_id_path is None:
+        class_id_path = os.path.join(config.ROOT_DIR, 'src', 'data_engineer', 'ClassID.txt')
+    
+    if os.path.exists(class_id_path):
+        print(f"ClassID.txt 로드 중: {class_id_path}")
+        with open(class_id_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split(' ', 1)
+                if len(parts) == 2:
+                    # 딕셔너리 문자열을 파싱 ({'name':..., 'yolo_id':0, 'fasterrcnn_id':1})
+                    info = ast.literal_eval(parts[1])
+                    # yolo_id를 키로 저장
+                    class_id_map[info['yolo_id']] = int(parts[0])
+    else:
+        print(f"경고: ClassID.txt를 찾을 수 없습니다: {class_id_path}")
+    
+    return class_id_map
+
+### 이미지 파일 목록 찾기 함수 (공통 유틸리티)
+def find_image_files(image_dir, extensions=None):
+    """
+    디렉토리 내에서 이미지 파일 목록을 찾아 반환합니다.
+    
+    Args:
+        image_dir: 이미지가 있는 디렉토리 경로
+        extensions: 처리할 이미지 확장자 목록 (기본값: ['.jpg', '.jpeg', '.png', '.bmp'])
+    
+    Returns:
+        list: 이미지 파일 경로 리스트
+    """
+    if extensions is None:
+        extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+    
+    image_files = []
+    for f in os.listdir(image_dir):
+        ext = os.path.splitext(f)[1].lower()
+        if ext in extensions:
+            image_files.append(os.path.join(image_dir, f))
+    
+    return image_files
 
 ### 단일 이미지 예측 및 저장하는 함수(사진 한 장 넣고 -> 탐지 후 -> 결과를 저장까지 하는 과정)
 def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True, model_path=None): # 이미지경로(image_path)를 받아서 모델로 객체를 찾고 결과를 파일과 csv파일로 저장하는 함수
@@ -87,9 +145,6 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     Returns:
         list: 각 이미지별 추론 결과
     """
-    if extensions is None:
-        extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-    
     if output_dir is None:          # 출력 폴더 없을 경우 기본 설정값 사용
         output_dir = config.INFERENCE_RESULT_DIR        
     
@@ -102,12 +157,8 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     
     detector = DrugDetector(model_path)
     
-    # 이미지 파일 목록 가져오기(처리할 파일 리스트 만드는 작업)
-    image_files = []
-    for f in os.listdir(image_dir):         # 폴더 내 파일 목록 가져오기
-        ext = os.path.splitext(f)[1].lower()    # 파일 확장자만 떼어내서 소문자로 변경(.PNG -> .png)
-        if ext in extensions:                   # 이미지 파일이 맞으면
-            image_files.append(os.path.join(image_dir, f))      # 리스트에 추가해달라고 하는 부분
+    # 이미지 파일 목록 가져오기 (공통 함수 사용)
+    image_files = find_image_files(image_dir, extensions)
     
     if not image_files:                       # 만약 이미지가 하나도 없을 경우, 경고 메시지 출력
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
@@ -198,7 +249,7 @@ def save_results_to_csv(results, csv_path, image_path=None):
             ])
 
 ### 제출용 CSV 생성
-def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0.001):
+def create_submission_csv(image_dir, output_path=None, model_path=None, conf = config.conf_threshold_submission):
     """
     제출용 CSV 파일을 생성합니다.
     
@@ -225,20 +276,18 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
     
     detector = DrugDetector(model_path)
     
-    # 이미지 파일 찾기
-    extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-    image_files = []
-    for f in os.listdir(image_dir):         # 폴더를 확인해서 이미지 파일만 골라옴
-        ext = os.path.splitext(f)[1].lower()
-        if ext in extensions:
-            image_files.append(os.path.join(image_dir, f))
+    # 이미지 파일 찾기 (공통 함수 사용)
+    image_files = find_image_files(image_dir)
     
     if not image_files:
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return None
     
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
-    
+
+    # ClassID 매핑 로드 (별도 함수 사용)
+    class_id_map = load_class_id_map()
+
     ### 제출용 파일 작성
     annotation_id = 1  # 1번부터 시작해서 1씩 증가
     
@@ -270,10 +319,15 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                     bbox_w = x2 - x1    # 폭 = 오른쪽 - 왼쪽
                     bbox_h = y2 - y1    # 높이 = 아래쪽 - 위쪽
                     
+                    # [수정] ClassID에 없는 번호는 에러 없이 건너뛰기
+                    category_id = det['category_id']
+                    if category_id not in class_id_map:
+                        continue
+                        
                     writer.writerow([
                         annotation_id,      # 고유번호
                         image_id,           # 이미지 번호
-                        det['category_id'], # 약 종류 번호
+                        class_id_map[category_id], # 약 종류 번호 (안전하게 접근)
                         bbox_x,             # 왼쪽 x좌표
                         bbox_y,             # 위쪽 y좌표
                         bbox_w,             # 폭
@@ -281,7 +335,7 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                         f"{det['confidence']:.4f}"      # 점수는 소수점 4자리까지 표시
                     ])
                     annotation_id += 1          # 다음 줄을 위한 번호 하나 증가
-                continue
+                
             except Exception as e:
                 print(f"오류 발생 ({img_path}): {e}")
                 continue

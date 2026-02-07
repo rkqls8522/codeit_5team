@@ -1,18 +1,17 @@
 # 모델 경로, 클래스 이름, 임계값 등의 설정파일
 import os
 
-# 1. 현재 파일(yolo_config.py)의 위치: src/model/yolo/
+# 1. 현재 파일의 위치
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-# 2. 프로젝트 루트 경로 찾기 (부모의 부모의 부모 폴더)
-# src/model/yolo/ -> src/model/ -> src/
+# 2. 프로젝트 루트 경로 찾기
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
 # 3. 결과 저장 경로 설정
 TRAIN_RESULT_DIR = os.path.join(ROOT_DIR, 'results') 
 INFERENCE_RESULT_DIR = os.path.join(ROOT_DIR, 'results', 'figures')
 # 4. 데이터셋 경로 설정
-data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')     # src/model/yolo/ 경로(수정)
+data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')
 
 # 5. 학습 데이터셋 경로 설정
 trained_model_path = os.path.join(TRAIN_RESULT_DIR, 'yolo_final_model', 'weights', 'best.pt')
@@ -23,10 +22,10 @@ test_images_dir = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test')  
 # 7. 제출 CSV 저장 경로
 submission_csv_path = os.path.join(INFERENCE_RESULT_DIR, 'submission.csv')
 
-# 8. mAP평가용 설정
-conf_threshold_submission = 0.001   # 제출용
+# 8. mAP평가용 설정 
+conf_threshold_submission = 0.001   
 
-# 9. IoU 임계값 설정
+# 9. IoU 임계값 설정 
 iou_threshold = 0.5 
 
 # 초기 모델 파일이름 (현재 폴더에 위치하도록 설정)

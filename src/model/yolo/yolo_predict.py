@@ -1,13 +1,14 @@
-### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###
 #======================================================================================
 # [모델 추론 및 결과 저장(이미지 + CSV)]
 # 학습된 모델을 사용해서 이미지를 추론을 하고 결과를 이미지와 CSV파일로 저장합니다.
 # 
-# 1. predict_and_save() : 단일 이미지를 읽은 후 추론하고 결과 이미지와 CSV파일을 각각 저장
-# 2. predict_batch() : 많은 이미지를 한꺼번에 분석할 때 사용
-# 3. save_results_to_csv() : 추론된 결과 리스트를 실제 CSV파일로 저장
-# 4. create_submission_csv() : 서브미션 제출용 파일 만드는 함수
-# 5. get_detection_summary() : 추론 결과에서 객체별로 개수, 평균 신뢰도 등을 계산하는 함수
+# 1. load_class_id_map(): 알약ID와 알약 이름정보를 연결하기 위한 함수(재사용성을 위해 만듦)
+# 2. find_image_files(): 폴더 안에 있는 알약 이미지 파일들의 목록을 찾기 위한 함수(재사용성을 위해 만듦)
+# 3. predict_and_save(): 이미지 한 장에서 알약을 찾고 결과를 저장하기 위한 함수
+# 4. predict_batch(): 여러 장의 이미지를 한꺼번에 꺼내 알약을 찾고 결과를 저장하기 위한 함수
+# 5. save_results_to_csv(): 찾은 결과를 CSV 파일로 저장하는 함수
+# 6. create_submission_csv(): 대회 제출용 mAP지표를 사용한 CSV파일을 생성하는 함수
+# 7. get_detection_summary(): 찾은 알약의 개수와 정확도 등을 요약해서 보기 위한 함수
 # =============================================================================================
 import os
 import csv
@@ -439,3 +440,5 @@ if __name__ == "__main__":
             create_submission_csv(image_dir, output_path, model_path=args.model)
         else:
             print(f"디렉토리를 찾을 수 없습니다: {image_dir}")
+
+### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###

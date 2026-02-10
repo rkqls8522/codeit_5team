@@ -1,4 +1,7 @@
-# 모델 경로, 클래스 이름, 임계값 등의 설정파일
+#======================================================================================
+# YOLO 모델을 학습 및 예측을 수행하기 전에 필요한 파일 경로와 하이퍼파라미터를 정의하는 과정
+# (모델 경로, 클래스 이름, 임계값 등의 설정파일)
+#======================================================================================
 import os
 
 # 1. 현재 파일의 위치
@@ -23,13 +26,13 @@ test_images_dir = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test')  
 submission_csv_path = os.path.join(INFERENCE_RESULT_DIR, 'submission.csv')
 
 # 8. mAP평가용 설정 
-conf_threshold_submission = 0.001   
+conf_threshold_submission = 0.001   # 모델평가점수를 높이기 위해 기준을 최대한 낮춤
 
-# 9. IoU 임계값 설정 
+# 9. IoU 임계값 설정 (같은 알약에 네모칸이 여러 개 겹칠 때, 50% 이상 겹치면 중복으로 보고 하나만 남김)
 iou_threshold = 0.5 
 
 # 초기 모델 파일이름 (현재 폴더에 위치하도록 설정)
-model_file = os.path.join(CURRENT_DIR, 'yolov8n.pt')
+model_file = os.path.join(CURRENT_DIR, 'yolov8s.pt')
 
 # 임시, 테스트보기위해 하나만 지정
 test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정

@@ -1,9 +1,10 @@
 import shutil
 from pathlib import Path as Path_Path
 from sklearn.model_selection import train_test_split
+import os
 
 
-def split_yolo_dataset(image_dir, anntation_dir, output_dir, val_ratio=0.2, seed=42, shuffle=True, image_exts=(".jpg", ".jpeg", ".png")):
+def split_yolo_dataset(image_dir, anntation_dir, output_dir, val_ratio=0.2, seed=42, shuffle=True, image_exts=(".jpg", ".jpeg", ".png"), file_name_list = None):
     image_dir = Path_Path(image_dir)
     anntation_dir = Path_Path(anntation_dir)
     output_dir = Path_Path(output_dir)
@@ -19,7 +20,18 @@ def split_yolo_dataset(image_dir, anntation_dir, output_dir, val_ratio=0.2, seed
         raise ValueError("이미지 파일이 없습니다.")
 
     # train / val split
-    train_imgs, val_imgs = train_test_split(images, test_size=val_ratio, random_state=seed, shuffle=shuffle)
+    if file_name_list:
+        train_imgs = []
+        val_imgs = []
+        for img in images:
+            if os.path.basename(img) in file_name_list:
+                val_imgs.append(img)
+            else:
+                train_imgs.append(img)
+        print(f"train 이미지 수: {len(train_imgs)}")
+        print(f"valid 이미지 수: {len(val_imgs)}")
+    else:
+        train_imgs, val_imgs = train_test_split(images, test_size=val_ratio, random_state=seed, shuffle=shuffle)
 
     def copy_pair(img_path, split):
         label_path = anntation_dir / f"{img_path.stem}.txt"

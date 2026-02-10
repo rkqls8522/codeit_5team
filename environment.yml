@@ -1,0 +1,16 @@
+name: healthit_5team
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - numpy
+  - pillow
+  - pyyaml
+  - opencv
+  - tqdm
+  - scikit-learn
+  - pip:
+      - ultralytics
+      - pandas

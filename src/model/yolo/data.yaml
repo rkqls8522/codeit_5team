@@ -1,4 +1,4 @@
-path: C:\Users\정주희\OneDrive\바탕 화면\코드잇 자료\codeit_5team\data\yolo_dataset
+path: C:\개발프로젝트\코드잇-5팀-초급프로젝트-헬스잇\data\yolo_dataset
 train: images/train
 val: images/val
 test: images/test

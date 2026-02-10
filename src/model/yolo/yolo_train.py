@@ -91,7 +91,7 @@ def train(resume=False):
                 batch=16,
                 project=config.TRAIN_RESULT_DIR,
                 name='yolo_final_model',
-                exist_ok=True,
+                exist_ok=False,
                 resume=resume)
     
     # 학습 시간 측정 종료

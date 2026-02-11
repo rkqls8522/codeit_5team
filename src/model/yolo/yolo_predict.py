@@ -17,6 +17,7 @@ import cv2
 import ast  
 
 from datetime import datetime
+import time
 
 import yolo_config as config
 from yolo_detector import DrugDetector
@@ -165,6 +166,8 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return []
     
+    inference_start_time = time.time()
+
     print(f"총 {len(image_files)}개 이미지 추론 시작...")
     
     ### 결과 저장 준비 구간(CSV 파일 생성)
@@ -215,6 +218,12 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
                 print(f"오류 발생 ({img_path}): {e}")
                 continue
     
+    inference_end_time = time.time()
+    inference_elapsed = inference_end_time - inference_start_time
+    inf_hours = int(inference_elapsed // 3600)
+    inf_minutes = int((inference_elapsed % 3600) // 60)
+    inf_seconds = int(inference_elapsed % 60)
+    print(f"\n총 추론 소요 시간: {inf_hours}시간 {inf_minutes}분 {inf_seconds}초 (총 {inference_elapsed:.2f}초)")
     print(f"\n배치 추론 완료!")
     print(f"- 총 처리 이미지: {len(all_results)}개")
     print(f"- 결과 이미지 저장 위치: {output_dir}")
@@ -284,6 +293,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return None
     
+    inference_start_time = time.time()
+
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
 
     # ClassID 매핑 로드 (별도 함수 사용)
@@ -340,7 +351,13 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
             except Exception as e:
                 print(f"오류 발생 ({img_path}): {e}")
                 continue
-    
+
+    inference_end_time = time.time()
+    inference_elapsed = inference_end_time - inference_start_time
+    inf_hours = int(inference_elapsed // 3600)
+    inf_minutes = int((inference_elapsed % 3600) // 60)
+    inf_seconds = int(inference_elapsed % 60)
+    print(f"\n총 추론 소요 시간: {inf_hours}시간 {inf_minutes}분 {inf_seconds}초 (총 {inference_elapsed:.2f}초)")
     print(f"\n제출용 CSV 생성 완료!")
     print(f"- 총 annotation 수: {annotation_id - 1}개")
     print(f"- 저장 위치: {output_path}")

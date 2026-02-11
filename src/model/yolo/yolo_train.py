@@ -11,6 +11,7 @@ import os
 import time
 import sys
 import yaml
+from torchvision.transforms import v2
 
 # 1. data_engineer 모듈 경로 먼저 추가 (그래야 함수를 쓸 수 있음)
 DATA_ENGINEER_DIR = os.path.join(config.ROOT_DIR, 'src', 'data_engineer')
@@ -21,6 +22,7 @@ try:
     from yolo_data_split import split_yolo_dataset
     from class_mapping import read_classID
     from yolo_get_file_name_list import get_file_name_YOLO
+    from yolo_img_converter import apply_v2_compose_and_save
     print("data_engineer 모듈 로드 성공")
 
     print(f"   └─ [확인] 전처리 모듈 경로: {os.path.abspath(DATA_ENGINEER_DIR)}")       
@@ -37,6 +39,14 @@ def prepare_data():
     master_dir = os.path.join(config.ROOT_DIR, 'data', 'original')
     image_dir = os.path.join(master_dir, "images", "train")
     annotation_dir = os.path.join(master_dir, "train_annotations")
+
+    # === YOLO 2번 실험: 선명도 조작 ===
+    transforms_sharp = v2.Compose([
+        v2.RandomAdjustSharpness(sharpness_factor=50.0, p=1.0),
+    ])
+    # 학습 이미지 선명도 변환
+    image_dir = apply_v2_compose_and_save(transforms_sharp, image_dir, master_dir, output_dir_name="converted img")
+    image_dir = str(image_dir)  # Path -> str 변환
 
     print("="*60)                                                       
     print(f"▶ [1단계] 원본 데이터 경로 확인")                           
@@ -81,7 +91,7 @@ def prepare_data():
     print(f"data.yaml 갱신 완료 (Classes: {len(yolo_names)})")
         
     # YOLO 어노테이션 생성
-    yolo_annt_dir= make_YOLO_annotation(image_dir, annotation_dir, class_dict,"YOLO_annotation")
+    yolo_annt_dir= make_YOLO_annotation(image_dir, annotation_dir, class_dict, "YOLO_annotation_file")
 
     # Valid 데이터 파일 이름 리스트 가져오기
     a_list= get_file_name_YOLO(annotation_dir, image_dir,-8)
@@ -97,6 +107,11 @@ def prepare_data():
     print("="*60)                                                             
 
     print("데이터 준비 완료!\n")
+    # 테스트 이미지도 선명도 변환
+    test_dir = config.test_images_dir
+    test_image_dir = apply_v2_compose_and_save(transforms_sharp, test_dir, master_dir, output_dir_name="new_test_img")
+    config.test_images_dir = str(test_image_dir)  # config의 test 경로를 변환된 경로로 업데이트
+    print(f"변환된 테스트 이미지 경로: {config.test_images_dir}")
     # 주의: 여기서 자기 자신(prepare_data)을 절대 호출하면 안 됨!
 def train(resume=False):
     """
@@ -111,14 +126,20 @@ def train(resume=False):
     print(f"학습 시작 시각: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
+                optimizer = 'AdamW',
+                lr0=0.001,
                 epochs=50,
                 imgsz=640,
                 device=config.device,
                 batch=10,
-                patience=10,
+                patience=20,
+                box=7.5,          # box loss 가중치
+                cls=1.0,          # 클래스 loss 가중치 올리기 (56개 클래스 분류 강화)
+                flipud=0.5,       # 상하 반전 추가
+                mixup=0.1,        # 믹스업 증강 추가
                 project=config.TRAIN_RESULT_DIR,
                 name='yolo_final_model',
-                exist_ok=True,                  
+                exist_ok=False,                  
                 resume=resume)
     
     # 학습 시간 측정 종료

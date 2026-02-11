@@ -39,7 +39,7 @@ test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '
 
 # 민감도 설정
 # 50% 이상 확실할 때 판단
-conf_threshold = 0.5
+conf_threshold = 0.3
 
 # 실행 시, "CUDA not available"에러 시 "cpu"로 변경
 device = "cpu"

@@ -32,13 +32,14 @@ conf_threshold_submission = 0.001   # 모델평가점수를 높이기 위해 기
 iou_threshold = 0.5 
 
 # 초기 모델 파일이름 (현재 폴더에 위치하도록 설정)
-model_file = os.path.join(CURRENT_DIR, 'yolov8s.pt')
+model_file = os.path.join(CURRENT_DIR, 'yolov8n.pt')
 
 # 임시, 테스트보기위해 하나만 지정
-test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정
+test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정 #### 이 부분 삭제할지 물어보기 (테스트용이여서 없어도되는데 삭제할지 물어보기)
 
 # 민감도 설정
-# 50% 이상 확실할 때 판단 => 나중 조정 예정(임시조치)
+# 50% 이상 확실할 때 판단
+# 0.25로 학습 결과 확인 후 결과가 안좋은 경우 0.3 또는 0.4로 조정 / 알약을 잘 못찾으면 0.1~0.2로 조정
 conf_threshold = 0.5
 
 # 실행 시, "CUDA not available"에러 시 "cpu"로 변경

@@ -20,6 +20,7 @@ try:
     from make_YOLO_annotation import make_YOLO_annotation
     from yolo_data_split import split_yolo_dataset
     from class_mapping import read_classID
+    from yolo_get_file_name_list import get_file_name_YOLO
     print("data_engineer 모듈 로드 성공")
 
     print(f"   └─ [확인] 전처리 모듈 경로: {os.path.abspath(DATA_ENGINEER_DIR)}")       
@@ -80,12 +81,14 @@ def prepare_data():
     print(f"data.yaml 갱신 완료 (Classes: {len(yolo_names)})")
         
     # YOLO 어노테이션 생성
-    print("YOLO 어노테이션 생성 중")
-    yolo_annt_dir = make_YOLO_annotation(image_dir, annotation_dir, class_dict, "YOLO_annotation")
-    
+    yolo_annt_dir= make_YOLO_annotation(image_dir, annotation_dir, class_dict,"YOLO_annotation")
+
+    # Valid 데이터 파일 이름 리스트 가져오기
+    a_list= get_file_name_YOLO(annotation_dir, image_dir,-8)
+
     # Train/Val 분할
     print("Train/Val 데이터 분할 중")
-    split_yolo_dataset(image_dir=image_dir, anntation_dir=yolo_annt_dir, output_dir=split_dir, val_ratio=0.2)
+    split_yolo_dataset(image_dir=image_dir,anntation_dir=yolo_annt_dir,output_dir=split_dir,val_ratio=0.2,file_name_list=a_list)
 
     print("="*60)                                                                
     print(f"▶ [2단계] 변환된 데이터셋 저장 위치 확인")                          
@@ -108,14 +111,14 @@ def train(resume=False):
     print(f"학습 시작 시각: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
-                epochs=100,
+                epochs=50,
                 imgsz=640,
                 device=config.device,
                 batch=10,
                 patience=10,
                 project=config.TRAIN_RESULT_DIR,
                 name='yolo_final_model',
-                exist_ok=True,                  # 기록 정리를 위해 덮어쓰기를 안한다고 설정했으며, 학습 시작 전에 폴더 정리하고 시작해야됩니다.
+                exist_ok=True,                  
                 resume=resume)
     
     # 학습 시간 측정 종료

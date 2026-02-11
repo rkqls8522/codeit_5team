@@ -110,7 +110,7 @@ def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True
     results = detector.detect(image)                    # 이미지 속 객체를 찾아 results에 좌표, 이름, 점수를 리스트 형태로 넣음
     
     # 파일명 생성 (타임스탬프 포함)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     base_name = os.path.splitext(os.path.basename(image_path))[0]       # 원본 파일 경로에서 파일명만 떼고(os.path.basename) -> splitext: 확장자(.jpg를 뗌)
                                                      # => 파일 명 중간 확장자가 들어가는 걸 막은 후 "이름+결과표시+화장자"조합으로 하기 위해 하는 작업(파일명을 깔끔하게 하기 위한 작업 및 결과 이미지의 화질 보호)
     # 결과 이미지 저장(save_image가 True일때만 저장)
@@ -172,7 +172,7 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     
     ### 결과 저장 준비 구간(CSV 파일 생성)
     all_results = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     
     # 전체 결과를 저장할 CSV
     batch_csv_path = os.path.join(output_dir, f"batch_results_{timestamp}.csv")
@@ -274,8 +274,20 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
         str: 생성된 CSV 파일 경로
     """
     # 저장 경로 설정
+    # - 파일명은 항상 submission_날짜_시간 형식으로 생성
+    # - output_path가 파일 경로로 들어와도 해당 폴더 위치만 사용
+    # 파일명 시간은 시/분까지만 사용 (예: 22시 40분 -> 2240)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     if output_path is None:
-        output_path = config.submission_csv_path
+        output_dir = os.path.dirname(config.submission_csv_path)
+    else:
+        output_dir = output_path if os.path.isdir(output_path) else os.path.dirname(output_path)
+
+    if not output_dir:
+        output_dir = "."
+
+    output_path = os.path.join(output_dir, f"submission_{timestamp}.csv")
+    log_path = os.path.join(output_dir, f"submission_{timestamp}_data.log")
     
     # 출력 디렉토리 생성
     os.makedirs(os.path.dirname(output_path), exist_ok=True)        # 파일이 저장될 폴더가 있는지 확인 후 없으면 생성
@@ -296,12 +308,16 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
     inference_start_time = time.time()
 
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
+    print(f"CSV 저장 파일명: {os.path.basename(output_path)}")
+    print(f"로그 저장 파일명: {os.path.basename(log_path)}")
 
     # ClassID 매핑 로드 (별도 함수 사용)
     class_id_map = load_class_id_map()
 
     ### 제출용 파일 작성
     annotation_id = 1  # 1번부터 시작해서 1씩 증가
+    per_image_times = []
+    success_images = 0
     
     with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
@@ -310,6 +326,7 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
         
         for idx, img_path in enumerate(image_files, 1):
             print(f"[{idx}/{len(image_files)}] 처리 중: {os.path.basename(img_path)}")
+            image_infer_start = time.time()
             
             try:
                 # 파일명에서 숫자ID만 추출
@@ -322,6 +339,9 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
                 # 추론 진행
                 image = load_image(img_path)
                 results = detector.detect(image, conf = conf)   # 신뢰도 기준을 낮출 수 있게 설정하였으나 변경가능예정
+                image_infer_elapsed = time.time() - image_infer_start
+                per_image_times.append((img_path, image_infer_elapsed))
+                success_images += 1
                        
                 for det in results:
                     x1, y1, x2, y2 = det['bbox']
@@ -350,6 +370,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
                 
             except Exception as e:
                 print(f"오류 발생 ({img_path}): {e}")
+                image_infer_elapsed = time.time() - image_infer_start
+                per_image_times.append((img_path, image_infer_elapsed))
                 continue
 
     inference_end_time = time.time()
@@ -357,10 +379,30 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
     inf_hours = int(inference_elapsed // 3600)
     inf_minutes = int((inference_elapsed % 3600) // 60)
     inf_seconds = int(inference_elapsed % 60)
+    avg_inference_elapsed = (
+        sum(t for _, t in per_image_times) / len(per_image_times) if per_image_times else 0.0
+    )
+
+    # 제출 추론 시간 로그 저장
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        log_file.write("submission inference timing log\n")
+        log_file.write(f"created_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        log_file.write(f"image_dir: {image_dir}\n")
+        log_file.write(f"total_images: {len(image_files)}\n")
+        log_file.write(f"successful_images: {success_images}\n")
+        log_file.write("-" * 60 + "\n")
+        for idx, (img_path, elapsed) in enumerate(per_image_times, 1):
+            log_file.write(f"{idx:04d}. {os.path.basename(img_path)}: {elapsed:.4f} sec\n")
+        log_file.write("-" * 60 + "\n")
+        log_file.write(f"total_inference_time_sec: {inference_elapsed:.4f}\n")
+        log_file.write(f"avg_inference_time_per_image_sec: {avg_inference_elapsed:.4f}\n")
+
     print(f"\n총 추론 소요 시간: {inf_hours}시간 {inf_minutes}분 {inf_seconds}초 (총 {inference_elapsed:.2f}초)")
+    print(f"이미지 평균 추론 시간: {avg_inference_elapsed:.4f}초")
     print(f"\n제출용 CSV 생성 완료!")
     print(f"- 총 annotation 수: {annotation_id - 1}개")
     print(f"- 저장 위치: {output_path}")
+    print(f"- 추론 로그 저장 위치: {log_path}")
     
     return output_path
 

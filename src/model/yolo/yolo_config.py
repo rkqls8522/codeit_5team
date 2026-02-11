@@ -20,7 +20,7 @@ data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')
 trained_model_path = os.path.join(TRAIN_RESULT_DIR, 'yolo_final_model', 'weights', 'best.pt')
 
 # 6. 테스트 이미지 폴더 (배치 추론용)
-test_images_dir = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test')      # 경로 수정
+test_images_dir = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test')
 
 # 7. 제출 CSV 저장 경로
 submission_csv_path = os.path.join(INFERENCE_RESULT_DIR, 'submission.csv')
@@ -35,11 +35,10 @@ iou_threshold = 0.5
 model_file = os.path.join(CURRENT_DIR, 'yolov8n.pt')
 
 # 임시, 테스트보기위해 하나만 지정
-test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정 #### 이 부분 삭제할지 물어보기 (테스트용이여서 없어도되는데 삭제할지 물어보기)
+test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')
 
 # 민감도 설정
 # 50% 이상 확실할 때 판단
-# 0.25로 학습 결과 확인 후 결과가 안좋은 경우 0.3 또는 0.4로 조정 / 알약을 잘 못찾으면 0.1~0.2로 조정
 conf_threshold = 0.5
 
 # 실행 시, "CUDA not available"에러 시 "cpu"로 변경

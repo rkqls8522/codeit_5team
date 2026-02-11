@@ -12,6 +12,8 @@ import time
 import sys
 import yaml
 
+os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
+
 # 1. data_engineer 모듈 경로 먼저 추가 (그래야 함수를 쓸 수 있음)
 DATA_ENGINEER_DIR = os.path.join(config.ROOT_DIR, 'src', 'data_engineer')
 sys.path.append(DATA_ENGINEER_DIR)

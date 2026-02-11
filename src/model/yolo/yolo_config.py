@@ -3,6 +3,7 @@
 # (모델 경로, 클래스 이름, 임계값 등의 설정파일)
 #======================================================================================
 import os
+import torch
 
 # 1. 현재 파일의 위치
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -32,7 +33,7 @@ conf_threshold_submission = 0.001   # 모델평가점수를 높이기 위해 기
 iou_threshold = 0.5 
 
 # 초기 모델 파일이름 (현재 폴더에 위치하도록 설정)
-model_file = os.path.join(CURRENT_DIR, 'yolov8s.pt')
+model_file = os.path.join(CURRENT_DIR, 'yolo8s.pt')
 
 # 임시, 테스트보기위해 하나만 지정
 test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '54.png')    # 경로수정
@@ -41,5 +42,6 @@ test_image_path = os.path.join(ROOT_DIR, 'data', 'original', 'images', 'test', '
 # 50% 이상 확실할 때 판단 => 나중 조정 예정(임시조치)
 conf_threshold = 0.5
 
-# 실행 시, "CUDA not available"에러 시 "cpu"로 변경
-device = "cpu"
+# 디바이스 자동 설정
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"[Device 설정] {device}")

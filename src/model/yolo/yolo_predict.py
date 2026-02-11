@@ -419,7 +419,7 @@ if __name__ == "__main__":
                 for class_name, info in summary.items():
                     print(f"  - {class_name}: {info['count']}개 (평균 신뢰도: {info['avg_confidence']:.2%})")
         else:
-            print(f"이미지를 찾을 수 없습니다: {image_path}")
+                print(f"이미지를 찾을 수 없습니다: {image_path}")
         
     elif args.mode == 'batch':
         # 배치 추론(폴더 자체로)

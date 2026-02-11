@@ -23,6 +23,45 @@ import yolo_config as config
 from yolo_detector import DrugDetector
 from yolo_utils import load_image, draw_box
 
+### predict 기본 모델 경로 선택 함수 (공통 유틸리티)
+def resolve_model_path(model_path=None):
+    """
+    추론에 사용할 모델 경로를 우선순위에 따라 결정합니다.
+
+    우선순위:
+    1) 함수 인자로 전달된 model_path
+    2) config.model_file 중 사용자 학습 모델로 보이는 .pt 파일 (src/model/yolo 내부)
+    3) config.trained_model_path (results/.../best.pt)
+    4) config.model_file (기본 가중치 포함)
+    """
+    # 1) 사용자가 명시한 모델 경로가 있으면 최우선
+    if model_path:
+        if os.path.exists(model_path):
+            return model_path
+        print(f"경고: 지정한 모델 경로를 찾을 수 없습니다: {model_path}")
+
+    model_file_path = getattr(config, "model_file", None)
+    trained_model_path = getattr(config, "trained_model_path", None)
+
+    # 2) config.model_file이 src/model/yolo 내부 .pt면 우선 사용
+    #    - 요청사항: 학습 후 src/model/yolo에 생성된 config 지정 모델 파일 우선 사용
+    if model_file_path and os.path.exists(model_file_path):
+        model_file_name = os.path.basename(model_file_path).lower()
+        is_pt = model_file_name.endswith(".pt")
+        is_default_base = model_file_name in {"yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"}
+        if is_pt and not is_default_base:
+            return model_file_path
+
+    # 3) 기존 best.pt 경로가 있으면 사용
+    if trained_model_path and os.path.exists(trained_model_path):
+        return trained_model_path
+
+    # 4) 마지막 fallback
+    if model_file_path and os.path.exists(model_file_path):
+        return model_file_path
+
+    return None
+
 ### ClassID 매핑 로드 함수 (공통 유틸리티)
 def load_class_id_map(class_id_path=None):
     """
@@ -100,8 +139,7 @@ def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True
     os.makedirs(output_dir, exist_ok=True)      # 관련 폴더가 있는지 확인 후 없으면 생성(exist_ok=True: 폴더가 이미 있어도 오류 안남)
     
     # 모델 로드 (모델 경로 설정)
-    if model_path is None and os.path.exists(config.trained_model_path):    # 만약 학습된 모델 파일이 있을 경우
-        model_path = config.trained_model_path                              # config.trained_model_path(학습시킨 best.pt)를 사용한다는 설정
+    model_path = resolve_model_path(model_path)
     
     detector = DrugDetector(model_path)                # DrugDetector 클래스의 객체를 생성
     image = load_image(image_path)                     # load_image 함수를 이용해서 이미지 불러오기
@@ -153,9 +191,8 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     # 저장폴더가 없으면 생성
     os.makedirs(output_dir, exist_ok=True)
     
-    # 모델 로드 (학습된 모델 우선)
-    if model_path is None and os.path.exists(config.trained_model_path):
-        model_path = config.trained_model_path
+    # 모델 로드 (공통 우선순위 로직 사용)
+    model_path = resolve_model_path(model_path)
     
     detector = DrugDetector(model_path)
     
@@ -292,9 +329,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
     # 출력 디렉토리 생성
     os.makedirs(os.path.dirname(output_path), exist_ok=True)        # 파일이 저장될 폴더가 있는지 확인 후 없으면 생성
     
-    # 모델 로드 (학습된 모델 우선 사용)
-    if model_path is None and os.path.exists(config.trained_model_path):
-        model_path = config.trained_model_path
+    # 모델 로드 (공통 우선순위 로직 사용)
+    model_path = resolve_model_path(model_path)
     
     detector = DrugDetector(model_path)
     

@@ -340,8 +340,6 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
     if not image_files:
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return None
-    
-    inference_start_time = time.time()
 
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
     print(f"CSV 저장 파일명: {os.path.basename(output_path)}")
@@ -376,7 +374,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
                 image = load_image(img_path)
                 results = detector.detect(image, conf = conf)   # 신뢰도 기준을 낮출 수 있게 설정하였으나 변경가능예정
                 image_infer_elapsed = time.time() - image_infer_start
-                per_image_times.append((img_path, image_infer_elapsed))
+                if idx >=4:
+                    per_image_times.append((img_path, image_infer_elapsed))
                 success_images += 1
                        
                 for det in results:
@@ -407,11 +406,12 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
             except Exception as e:
                 print(f"오류 발생 ({img_path}): {e}")
                 image_infer_elapsed = time.time() - image_infer_start
-                per_image_times.append((img_path, image_infer_elapsed))
+                if idx >=4:
+                    per_image_times.append((img_path, image_infer_elapsed))
                 continue
 
-    inference_end_time = time.time()
-    inference_elapsed = inference_end_time - inference_start_time
+
+    inference_elapsed = sum(t for _, t in per_image_times)  # 4번째부터의 시간 합계
     inf_hours = int(inference_elapsed // 3600)
     inf_minutes = int((inference_elapsed % 3600) // 60)
     inf_seconds = int(inference_elapsed % 60)

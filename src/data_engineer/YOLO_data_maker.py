@@ -8,6 +8,17 @@ from torchvision import tv_tensors
 from PIL import Image
 
 
+
+# image_dir:            이미지 폴더 경로
+# annotation_dir:       annotation 폴더 경로
+# image_train_dir:      생성할 YOLO train 폴더 경로
+# labels_train_dir:     생성할 txt annotation 폴더 경로
+# transforms:           적용할 transforms
+# img_name_list:        증강에 사용할 이미지 이름 리스트
+# how_many:             몇 장 증강할 것인지
+# class_dict:           class_id 딕셔너리(codeit_5team\src\data_engineer\ClassID.txt)
+
+
 def data_maker(image_dir, annotation_dir, image_train_dir, labels_train_dir, transforms, img_name_list, how_many, class_dict, load_exts = ("*.jpg", "*.png", "*.jpeg"), all_mode = False):
 
     print("경로를 불러옵니다.")

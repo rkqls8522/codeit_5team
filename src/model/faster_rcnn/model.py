@@ -1,3 +1,6 @@
+# Faster R-CNN 모델 로드 + classifier head 교체
+# COCO pretrained 가져와서 우리 클래스 수(57)에 맞게 바꿈
+
 import torchvision
 from torchvision.models.detection import (
     fasterrcnn_resnet50_fpn,

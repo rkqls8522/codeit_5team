@@ -1,3 +1,6 @@
+# DataLoader 생성 (train/valid/test)
+# collate_fn으로 이미지 크기 다른 배치 처리
+
 from torch.utils.data import DataLoader
 
 def collate_fn(batch):

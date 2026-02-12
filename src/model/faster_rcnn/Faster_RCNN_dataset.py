@@ -1,3 +1,6 @@
+# Dataset 클래스 + augmentation 정의
+# train/valid/test 데이터셋 로딩, Albumentations augmentation, Mosaic 등
+
 import json as json_json
 from pathlib import Path
 from PIL import Image

@@ -1,3 +1,6 @@
+# 추론 + Kaggle CSV 생성
+# Soft-NMS 적용해서 겹치는 박스 처리하고 제출용 csv 만듦
+
 import os
 import csv
 import torch

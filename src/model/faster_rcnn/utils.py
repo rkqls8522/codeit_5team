@@ -1,3 +1,5 @@
+# 예측 결과 시각화 (bbox + label 그려줌)
+
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 

@@ -1,3 +1,6 @@
+# 전체 파이프라인 실행 (데이터 로딩 → 학습 → 평가)
+# 로컬에서 돌릴 때 쓰는 파일, Colab은 노트북 사용
+
 import os
 import torch
 from sklearn.model_selection import train_test_split

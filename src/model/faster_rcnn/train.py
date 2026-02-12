@@ -1,3 +1,6 @@
+# 학습 루프
+# optimizer, scheduler 설정 + epoch 돌면서 best loss 체크포인트 저장
+
 import torch
 import os
 from config import CONFIG

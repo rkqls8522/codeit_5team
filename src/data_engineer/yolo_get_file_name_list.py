@@ -3,6 +3,14 @@ import glob
 import os
 import json as json_json
 
+
+
+# anntation_dir:    annotation 폴더 경로
+# image_dir:        이미지 폴더 경로
+# sls_num:          몇번 클래스(오름차 순) 부터 불러올 것인지
+# els_num:          몇번 까지 불러올 것인지
+# max_len:          최대 구하는 이미지 수(20일 시 20개가 채워지면 반환)
+
 def get_file_name_YOLO(anntation_dir, image_dir, sls_num = 0, els_num=None, max_len = 20, load_exts = ("*.jpg", "*.png", "*.jpeg")):
 
     anntation_file_path_list = glob.glob(os.path.join(anntation_dir,  "**"), recursive=True)

@@ -6,6 +6,11 @@ import glob
 import os
 
 
+# transform:            적용할 transform
+# image_dir:            이미지 폴더 경로
+# master_dir:           저장할 폴더 경로
+# output_dir_name:      저장할 폴더 이름
+
 def apply_v2_compose_and_save(transform, image_dir, master_dir, output_dir_name="converted img", load_exts = ("*.jpg", "*.png", "*.jpeg")):
     master_dir = Path_Path(master_dir)
     save_dir = master_dir / output_dir_name

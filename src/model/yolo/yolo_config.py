@@ -12,7 +12,7 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
 # 3. 결과 저장 경로 설정
 TRAIN_RESULT_DIR = os.path.join(ROOT_DIR, 'results') 
-INFERENCE_RESULT_DIR = os.path.join(ROOT_DIR, 'results', 'figures')
+INFERENCE_RESULT_DIR = os.path.join(ROOT_DIR, 'results', 'submission')
 # 4. 데이터셋 경로 설정
 data_yaml_path = os.path.join(CURRENT_DIR, 'data.yaml')
 

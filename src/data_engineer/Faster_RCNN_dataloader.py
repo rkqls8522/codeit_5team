@@ -42,7 +42,6 @@ def test_build_dataloaders(test_dataset, batch_size, num_workers=0, shuffle=Fals
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        collate_fn=collate_fn
     )
 
     return test_loader

@@ -7,9 +7,11 @@
 #======================================================================================
 from ultralytics import YOLO
 import yolo_config as config
+from datetime import datetime
 import os
 import time
 import sys
+import shutil
 import yaml
 
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
@@ -104,20 +106,23 @@ def train(resume=False):
     # 4. 학습 시작 전에 데이터 준비 실행 (여기서 호출!)
     prepare_data()
     model = YOLO(config.model_file)
+
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    run_name = f'yolo_train_{timestamp}'
     
     # 학습 시간 측정 시작
     start_time = time.time()
     print(f"학습 시작 시각: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
-                epochs=100,
+                epochs=50,
                 imgsz=640,
                 device=config.device,
                 batch=10,
                 patience=10,
                 project=config.TRAIN_RESULT_DIR,
-                name='yolo_final_model',
-                exist_ok=True,                  # 기록 정리를 위해 덮어쓰기를 안한다고 설정했으며, 학습 시작 전에 폴더 정리하고 시작해야됩니다.
+                name=run_name,
+                exist_ok=True,                  
                 resume=resume)
     
     # 학습 시간 측정 종료
@@ -133,9 +138,20 @@ def train(resume=False):
     print(f"총 학습 소요 시간: {hours}시간 {minutes}분 {seconds}초 (총 {elapsed_time:.2f}초)") 
     
     # 학습된 모델 경로 반환
-    best_model_path = os.path.join(config.TRAIN_RESULT_DIR, 'yolo_final_model', 'weights', 'best.pt')       # 경로수정
+    best_model_path = os.path.join(config.TRAIN_RESULT_DIR, run_name, 'weights', 'best.pt')
     print(f"학습 완료, Best 모델 저장 위치: {best_model_path}")
-    
+
+    # [추가] 추론(Inference) 편의를 위해 최신 모델을 기본 경로(yolo_final_model)로 복사
+    final_fixed_path = config.trained_model_path  # .../results/yolo_final_model/weights/best.pt
+
+    # 복사할 폴더가 없으면 생성
+    os.makedirs(os.path.dirname(final_fixed_path), exist_ok=True)
+
+    # 파일 복사
+    shutil.copy(best_model_path, final_fixed_path)
+    print(f"[자동갱신] 최신 모델이 기본 경로로 복사되었습니다: {final_fixed_path}")
+    print("이제 yolo_predict.py를 실행하면 자동으로 이 모델이 사용됩니다.")
+
     return best_model_path
 if __name__ == "__main__":
     train()

@@ -8,6 +8,11 @@ import json as json_json
 from pathlib import Path as Path_Path
 
 
+# image_dir:        이미지 폴더 경로
+# anntation_dir:    annotation 폴더 경로
+# class_dict:       class_id 딕셔너리(codeit_5team\src\data_engineer\ClassID.txt)
+# folder_name:      생성할 폴더 이름
+
 def make_YOLO_annotation(image_dir, anntation_dir, class_dict, folder_name="YOLO annotation", load_exts = ("*.jpg", "*.png", "*.jpeg")):
     #   json, image 경로 설정
 

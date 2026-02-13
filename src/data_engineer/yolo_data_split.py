@@ -4,6 +4,13 @@ from sklearn.model_selection import train_test_split
 import os
 
 
+# image_dir:        이미지 폴더 경로
+# anntation_dir:    annotation 폴더 경로
+# output_dir:       출력 폴더 경로
+# val_ratio:        valid 비율(0.2 -> 20%)
+# seed:             재현성 유지를 위한 시드
+# shuffle:          shuffle 할 것인지
+
 def split_yolo_dataset(image_dir, anntation_dir, output_dir, val_ratio=0.2, seed=42, shuffle=True, image_exts=(".jpg", ".jpeg", ".png"), file_name_list = None):
     image_dir = Path_Path(image_dir)
     anntation_dir = Path_Path(anntation_dir)

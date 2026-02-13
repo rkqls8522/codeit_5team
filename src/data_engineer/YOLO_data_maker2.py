@@ -9,6 +9,15 @@ import torch
 from torchvision import tv_tensors
 
 
+
+# img_dir:          이미지 폴더 경로
+# yolo_annt_dir:    annotation 폴더 경로
+# cls_id:           class_id 딕셔너리(codeit_5team\src\data_engineer\ClassID.txt)
+# class_list:       json에 기록된 클래스 아이디(1900 ~ )
+# start_num:        파일 이름 번호를 몇번 부터 할 것인지  (파일 이름)_(start_num 부터 시작)
+# how_many:         반복 횟수
+# file_name:        파일 이름 설정
+
 def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_many=3, file_name="yolo_augmentation", load_exts = ("*.jpg", "*.png", "*.jpeg"), transforms = None):
 
     yolo_annt_list = glob.glob(os.path.join(yolo_annt_dir, "**", "*.txt"), recursive=True)
@@ -75,7 +84,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                         target = {}
                                         h_img, w_img = img.shape[:2]
         
-                                        target["boxes"] = torch.tensor([[x1, y1, x2, y2]], dtype=torch.float32) ############################### tv_tensor 변환
+                                        target["boxes"] = torch.tensor([[x1, y1, x2, y2]], dtype=torch.float32) ############################### tv_tensor 변환 (미완성, 사용 금지)
                                         img_tensor = torch.from_numpy(img).permute(2, 0, 1).contiguous()
                                         img = tv_tensors.Image(img_tensor)
                                         
@@ -98,15 +107,15 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                             x1 = np.clip(x1, 0, w_img)
                                             y1 = np.clip(y1, 0, h_img)
                                             x2 = np.clip(x2, 0, w_img)
-                                            y2 = np.clip(y2, 0, h_img)                                      ############################### tv_tensor 변환
+                                            y2 = np.clip(y2, 0, h_img)                                      ############################### tv_tensor 변환 (미완성, 사용 금지)
                                     
                                     mean_color = img[y2-2:y2, x2-2:x2].mean(axis=(0, 1))
                                     pill_roi = img[y1:y2, x1:x2]   # 관심 영역
         
                             hig, wth = pill_roi.shape[:2]
                             
-                            if i == 0:
-                                ps_img[0:ps_center[0],0:ps_center[1]] = mean_color
+                            if i == 0:                                                          # 좌상단, 우상단, 좌하단, 우하단 순으로 읽어온 이미지를 잘라 붙임
+                                ps_img[0:ps_center[0],0:ps_center[1]] = mean_color              # 좌 상단
                                 if ((ps_center[0] / 2) < (hig / 2)) or ((ps_center[1] / 2) < (wth / 2)):
                                     ps_img[0:hig,0:wth] = pill_roi
                                 else:
@@ -117,7 +126,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                     ps_img[y1:y2,x1:x2] = pill_roi
                 
                             elif i == 1:
-                                ps_img[0:ps_center[0],ps_center[1]:w] = mean_color
+                                ps_img[0:ps_center[0],ps_center[1]:w] = mean_color              # 우 상단
                                 if ((ps_center[0] / 2) < (hig / 2)) or ((ps_center[1] / 2) < (wth / 2)):
                                     ps_img[0:hig,w-wth:w] = pill_roi
                                 else:
@@ -128,7 +137,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                     ps_img[y1:y2,x1:x2] = pill_roi
                 
                             elif i == 2:
-                                ps_img[ps_center[0]:h,0:ps_center[1]] = mean_color
+                                ps_img[ps_center[0]:h,0:ps_center[1]] = mean_color              # 좌 하단
                                 if ((ps_center[0] / 2) < (hig / 2)) or ((ps_center[1] / 2) < (wth / 2)):
                                     ps_img[h-hig:h,0:wth] = pill_roi
                                 else:
@@ -139,7 +148,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                     ps_img[y1:y2,x1:x2] = pill_roi
                 
                             elif i == 3:
-                                ps_img[ps_center[0]:h,ps_center[1]:w] = mean_color
+                                ps_img[ps_center[0]:h,ps_center[1]:w] = mean_color              # 우 하단
                                 if ((ps_center[0] / 2) < (hig / 2)) or ((ps_center[1] / 2) < (wth / 2)):
                                     ps_img[h-hig:h, w-wth:w] = pill_roi
                                 else:
@@ -152,7 +161,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                             bbox_list.append([x1,y1,x2,y2])
                             id_list.append(cls)
             
-                            if (i == 3) or (len(yolo_annt_list) == len(cmp_annt)):
+                            if (i == 3) or (len(yolo_annt_list) == len(cmp_annt)):          # 4개가 채워지거나 annotation을 모두 읽었을 시, 증강 이미지 저장
                                 ps_img_rgb = cv2.cvtColor(ps_img, cv2.COLOR_BGR2RGB)
         
                                 img = cv2.imread(img_path_list[0])
@@ -163,7 +172,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
 
                                 txt_path = os.path.join(yolo_annt_dir, f"{file_name}_{num}_{i2}.txt")
 
-                                for bbox, id in zip(bbox_list, id_list):
+                                for bbox, id in zip(bbox_list, id_list):                        # YOLO annotation text파일 저장 부분
                                     x, y, xx, yy = bbox
 
                                     if not Path_Path(txt_path).exists():
@@ -173,7 +182,7 @@ def data_maker2(img_dir, yolo_annt_dir, cls_id, class_list, start_num = 0, how_m
                                         with open(txt_path, "a", encoding="utf-8") as f:
                                             f.write(f"\n{id} {(x+((xx-x)/2))/w:.6f} {(y+((yy-y)/2))/h:.6f} {(xx-x)/w:.6f} {(yy-y)/h:.6f}")
 
-                                save_img_path = os.path.join(img_dir, f"{file_name}_{num}_{i2}.png")
+                                save_img_path = os.path.join(img_dir, f"{file_name}_{num}_{i2}.png")        # 증강 이미지 저장 부분
                                 Image.fromarray(ps_img_rgb).save(save_img_path)
 
                                 print(f"{file_name}_{num}_{i2}.png 증강 완료.")

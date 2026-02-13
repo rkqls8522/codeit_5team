@@ -33,31 +33,31 @@ validation_transforms = v2.Compose([
 ])
 
 ###     train,valid dataset class
-class FasterRCNNDataset(Dataset):
+class FasterRCNNDataset(Dataset):                     # 데이터셋 클래스
     def __init__(self, img_dir, annt_dir, class_dict, transforms=training_transforms, img_path_list_mode=False, img_path_list=[]):
-        self.img_dir = img_dir
-        self.annt_dir = annt_dir
-        img_p_list, annt_list = self._sorted_img_annt_path(img_dir, annt_dir, class_dict, img_path_list_mode=img_path_list_mode, img_path_list=img_path_list)
-        self.img_p_list = img_p_list
-        self.annt_list = annt_list
-        self.transforms = transforms
+        self.img_dir = img_dir      # 이미지 폴더 경로
+        self.annt_dir = annt_dir    # annotation 폴더 경로
+        img_p_list, annt_list = self._sorted_img_annt_path(img_dir, annt_dir, class_dict, img_path_list_mode=img_path_list_mode, img_path_list=img_path_list)   #이미지 path list와 annotation list를 가져옴
+        self.img_p_list = img_p_list    # 이미지 경로 리스트
+        self.annt_list = annt_list      # annotation 경로 리스트
+        self.transforms = transforms    #transforms
 
     def __len__(self):
         return len(self.img_p_list)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx):         # dataset __getitem__ 부분
 
         img_path = self.img_p_list[idx]
         image = Image.open(img_path).convert("RGB")
 
-        for annt in self.annt_list[idx][0]:
+        for annt in self.annt_list[idx][0]:     # X,y,W,H -> X,Y,X,Y 형식으로 변환
             annt[2] = annt[0] +annt[2]
             annt[3] = annt[1] +annt[3]
         boxes = torch.tensor(self.annt_list[idx][0], dtype=torch.float32)
         labels = torch.tensor(self.annt_list[idx][1], dtype=torch.int64)
         imgsize = self.annt_list[idx][2][0]
 
-        target = {
+        target = {                      # 필요 내용 딕셔너리 저장
             "boxes": boxes,
             "labels": labels,
             "image_id": torch.tensor([idx]),
@@ -65,9 +65,9 @@ class FasterRCNNDataset(Dataset):
             "iscrowd": torch.zeros((len(boxes),), dtype=torch.int64),
         }
 
-        if self.transforms:
+        if self.transforms:         # transforms가 있으면 변환
             if len(boxes) > 0:
-                tv_boxes = tv_tensors.BoundingBoxes(
+                tv_boxes = tv_tensors.BoundingBoxes(    # tv_tensor 적용
                     target["boxes"], 
                     format="XYXY", 
                     canvas_size=imgsize
@@ -96,24 +96,24 @@ class FasterRCNNDataset(Dataset):
             img_p_list = img_path_list
         else:
             img_p_list = []
-            for ext in load_exts:
+            for ext in load_exts:                   # 폴더에 모든 이미지 경로 저장
                 img_p_list.extend(
                     glob.glob(os.path.join(img_dir, "**", ext), recursive=True)
                 )
         
-        anntation_file_path_list = glob.glob(os.path.join(annt_dir,  "**"), recursive=True)
-        annt_p_list = [p for p in anntation_file_path_list if os.path.splitext(p)[1]==".json"]
+        anntation_file_path_list = glob.glob(os.path.join(annt_dir,  "**"), recursive=True)     # 폴더에 모든 파일 경로 저장
+        annt_p_list = [p for p in anntation_file_path_list if os.path.splitext(p)[1]==".json"]  # json 파일만 걸러냄
         json_list = []
         for path in annt_p_list:
             with open(path, "r", encoding="utf-8") as f:
-                json_list.append(json_json.load(f))
+                json_list.append(json_json.load(f))         # json 파일 읽어옴
 
         annt_list = []
         for img_p in img_p_list:
             img_annt_boxes = []
             img_annt_labels = []
             img_annt_imgsize = []
-            for json in json_list:
+            for json in json_list:                                                  # 파일 이름, bbox, id, 이미지 높이, 이미지 넓이를 가져옴
                 if json["images"][0]["file_name"] == os.path.basename(img_p):
                     boxes = json["annotations"][0]["bbox"]
                     img_annt_boxes.append(boxes)
@@ -125,7 +125,7 @@ class FasterRCNNDataset(Dataset):
         return img_p_list, annt_list
 
 ###     test dataset class
-class TestDataset(Dataset):
+class TestDataset(Dataset):                     # 테스트 데이터셋 클래스
     def __init__(self, img_dir, transforms=training_transforms, load_exts = ("*.jpg", "*.png", "*.jpeg")):
         self.img_dir = img_dir
         self.transforms = transforms

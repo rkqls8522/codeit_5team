@@ -16,4 +16,8 @@ __pycache__/
 condaenv*.txt
 
 # 산출물
-results/
+results/*
+!results/submission/
+results/submission/*
+!results/submission/.gitkeep
+!results/submission/submission.csv

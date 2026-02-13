@@ -1,14 +1,121 @@
-### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###
-# 추론 및 결과 저장 (이미지 + CSV)
+#======================================================================================
+# [모델 추론 및 결과 저장(이미지 + CSV)]
+# 학습된 모델을 사용해서 이미지를 추론을 하고 결과를 이미지와 CSV파일로 저장합니다.
+# 
+# 1. load_class_id_map(): 알약ID와 알약 이름정보를 연결하기 위한 함수(재사용성을 위해 만듦)
+# 2. find_image_files(): 폴더 안에 있는 알약 이미지 파일들의 목록을 찾기 위한 함수(재사용성을 위해 만듦)
+# 3. predict_and_save(): 이미지 한 장에서 알약을 찾고 결과를 저장하기 위한 함수
+# 4. predict_batch(): 여러 장의 이미지를 한꺼번에 꺼내 알약을 찾고 결과를 저장하기 위한 함수
+# 5. save_results_to_csv(): 찾은 결과를 CSV 파일로 저장하는 함수
+# 6. create_submission_csv(): 대회 제출용 mAP지표를 사용한 CSV파일을 생성하는 함수
+# 7. get_detection_summary(): 찾은 알약의 개수와 정확도 등을 요약해서 보기 위한 함수
+# =============================================================================================
 import os
 import csv
 import re
 import cv2
+import ast  
+import torch
+
 from datetime import datetime
+import time
 
 import yolo_config as config
 from yolo_detector import DrugDetector
 from yolo_utils import load_image, draw_box
+
+### predict 기본 모델 경로 선택 함수 (공통 유틸리티)
+def resolve_model_path(model_path=None):
+    """
+    추론에 사용할 모델 경로를 우선순위에 따라 결정합니다.
+
+    우선순위:
+    1) 함수 인자로 전달된 model_path
+    2) config.model_file 중 사용자 학습 모델로 보이는 .pt 파일 (src/model/yolo 내부)
+    3) config.trained_model_path (results/.../best.pt)
+    4) config.model_file (기본 가중치 포함)
+    """
+    # 1) 사용자가 명시한 모델 경로가 있으면 최우선
+    if model_path:
+        if os.path.exists(model_path):
+            return model_path
+        print(f"경고: 지정한 모델 경로를 찾을 수 없습니다: {model_path}")
+
+    model_file_path = getattr(config, "model_file", None)
+    trained_model_path = getattr(config, "trained_model_path", None)
+
+    # 2) config.model_file이 src/model/yolo 내부 .pt면 우선 사용
+    #    - 요청사항: 학습 후 src/model/yolo에 생성된 config 지정 모델 파일 우선 사용
+    if model_file_path and os.path.exists(model_file_path):
+        model_file_name = os.path.basename(model_file_path).lower()
+        is_pt = model_file_name.endswith(".pt")
+        is_default_base = model_file_name in {"yolov8n.pt", "yolov8s.pt", "yolov8m.pt", "yolov8l.pt", "yolov8x.pt"}
+        if is_pt and not is_default_base:
+            return model_file_path
+
+    # 3) 기존 best.pt 경로가 있으면 사용
+    if trained_model_path and os.path.exists(trained_model_path):
+        return trained_model_path
+
+    # 4) 마지막 fallback
+    if model_file_path and os.path.exists(model_file_path):
+        return model_file_path
+
+    return None
+
+### ClassID 매핑 로드 함수 (공통 유틸리티)
+def load_class_id_map(class_id_path=None):
+    """
+    ClassID.txt 파일을 읽어서 YOLO class ID를 category ID로 매핑하는 딕셔너리를 반환합니다.
+    
+    Args:
+        class_id_path: ClassID.txt 파일 경로 (기본값: config.ROOT_DIR/src/data_engineer/ClassID.txt)
+    
+    Returns:
+        dict: {yolo_id: category_id} 형태의 딕셔너리
+    """
+    class_id_map = {}
+    
+    if class_id_path is None:
+        class_id_path = os.path.join(config.ROOT_DIR, 'src', 'data_engineer', 'ClassID.txt')
+    
+    if os.path.exists(class_id_path):
+        print(f"ClassID.txt 로드 중: {class_id_path}")
+        with open(class_id_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split(' ', 1)
+                if len(parts) == 2:
+                    # 딕셔너리 문자열을 파싱 ({'name':..., 'yolo_id':0, 'fasterrcnn_id':1})
+                    info = ast.literal_eval(parts[1])
+                    # yolo_id를 키로 저장
+                    class_id_map[info['yolo_id']] = int(parts[0])
+    else:
+        print(f"경고: ClassID.txt를 찾을 수 없습니다: {class_id_path}")
+    
+    return class_id_map
+
+### 이미지 파일 목록 찾기 함수 (공통 유틸리티)
+def find_image_files(image_dir, extensions=None):
+    """
+    디렉토리 내에서 이미지 파일 목록을 찾아 반환합니다.
+    
+    Args:
+        image_dir: 이미지가 있는 디렉토리 경로
+        extensions: 처리할 이미지 확장자 목록 (기본값: ['.jpg', '.jpeg', '.png', '.bmp'])
+    
+    Returns:
+        list: 이미지 파일 경로 리스트
+    """
+    if extensions is None:
+        extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+    
+    image_files = []
+    for f in os.listdir(image_dir):
+        ext = os.path.splitext(f)[1].lower()
+        if ext in extensions:
+            image_files.append(os.path.join(image_dir, f))
+    
+    return image_files
 
 ### 단일 이미지 예측 및 저장하는 함수(사진 한 장 넣고 -> 탐지 후 -> 결과를 저장까지 하는 과정)
 def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True, model_path=None): # 이미지경로(image_path)를 받아서 모델로 객체를 찾고 결과를 파일과 csv파일로 저장하는 함수
@@ -33,8 +140,7 @@ def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True
     os.makedirs(output_dir, exist_ok=True)      # 관련 폴더가 있는지 확인 후 없으면 생성(exist_ok=True: 폴더가 이미 있어도 오류 안남)
     
     # 모델 로드 (모델 경로 설정)
-    if model_path is None and os.path.exists(config.trained_model_path):    # 만약 학습된 모델 파일이 있을 경우
-        model_path = config.trained_model_path                              # config.trained_model_path(학습시킨 best.pt)를 사용한다는 설정
+    model_path = resolve_model_path(model_path)
     
     detector = DrugDetector(model_path)                # DrugDetector 클래스의 객체를 생성
     image = load_image(image_path)                     # load_image 함수를 이용해서 이미지 불러오기
@@ -43,7 +149,7 @@ def predict_and_save(image_path, output_dir=None, save_image=True, save_csv=True
     results = detector.detect(image)                    # 이미지 속 객체를 찾아 results에 좌표, 이름, 점수를 리스트 형태로 넣음
     
     # 파일명 생성 (타임스탬프 포함)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     base_name = os.path.splitext(os.path.basename(image_path))[0]       # 원본 파일 경로에서 파일명만 떼고(os.path.basename) -> splitext: 확장자(.jpg를 뗌)
                                                      # => 파일 명 중간 확장자가 들어가는 걸 막은 후 "이름+결과표시+화장자"조합으로 하기 위해 하는 작업(파일명을 깔끔하게 하기 위한 작업 및 결과 이미지의 화질 보호)
     # 결과 이미지 저장(save_image가 True일때만 저장)
@@ -80,37 +186,31 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     Returns:
         list: 각 이미지별 추론 결과
     """
-    if extensions is None:
-        extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-    
     if output_dir is None:          # 출력 폴더 없을 경우 기본 설정값 사용
         output_dir = config.INFERENCE_RESULT_DIR        
     
     # 저장폴더가 없으면 생성
     os.makedirs(output_dir, exist_ok=True)
     
-    # 모델 로드 (학습된 모델 우선)
-    if model_path is None and os.path.exists(config.trained_model_path):
-        model_path = config.trained_model_path
-    
+    # 모델 로드 (공통 우선순위 로직 사용)
+    model_path = resolve_model_path(model_path)
+
     detector = DrugDetector(model_path)
     
-    # 이미지 파일 목록 가져오기(처리할 파일 리스트 만드는 작업)
-    image_files = []
-    for f in os.listdir(image_dir):         # 폴더 내 파일 목록 가져오기
-        ext = os.path.splitext(f)[1].lower()    # 파일 확장자만 떼어내서 소문자로 변경(.PNG -> .png)
-        if ext in extensions:                   # 이미지 파일이 맞으면
-            image_files.append(os.path.join(image_dir, f))      # 리스트에 추가해달라고 하는 부분
+    # 이미지 파일 목록 가져오기 (공통 함수 사용)
+    image_files = find_image_files(image_dir, extensions)
     
     if not image_files:                       # 만약 이미지가 하나도 없을 경우, 경고 메시지 출력
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return []
     
+    inference_start_time = time.time()
+
     print(f"총 {len(image_files)}개 이미지 추론 시작...")
     
     ### 결과 저장 준비 구간(CSV 파일 생성)
     all_results = []
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     
     # 전체 결과를 저장할 CSV
     batch_csv_path = os.path.join(output_dir, f"batch_results_{timestamp}.csv")
@@ -156,6 +256,12 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
                 print(f"오류 발생 ({img_path}): {e}")
                 continue
     
+    inference_end_time = time.time()
+    inference_elapsed = inference_end_time - inference_start_time
+    inf_hours = int(inference_elapsed // 3600)
+    inf_minutes = int((inference_elapsed % 3600) // 60)
+    inf_seconds = int(inference_elapsed % 60)
+    print(f"\n총 추론 소요 시간: {inf_hours}시간 {inf_minutes}분 {inf_seconds}초 (총 {inference_elapsed:.2f}초)")
     print(f"\n배치 추론 완료!")
     print(f"- 총 처리 이미지: {len(all_results)}개")
     print(f"- 결과 이미지 저장 위치: {output_dir}")
@@ -191,7 +297,80 @@ def save_results_to_csv(results, csv_path, image_path=None):
             ])
 
 ### 제출용 CSV 생성
-def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0.001):
+def _sanitize_filename_part(value):
+    """
+    파일명에 쓸 수 없는 문자를 안전한 문자(_)로 치환합니다.
+    - 모델명이 경로 형태(`/path/to/yolov8l.pt`)일 수 있어 basename/확장자 처리 전에 정리 필요
+    - Windows 금지문자: \\ / : * ? " < > |
+    """
+    if not value:
+        return "model"
+
+    # 파일 시스템에서 허용하지 않는 문자들을 '_'로 치환
+    cleaned = re.sub(r'[\\/:*?"<>|]+', "_", str(value)).strip()
+    return cleaned or "model"
+
+
+def _extract_model_name_from_best_pt(model_path):
+    """
+    best.pt 파일 하나만 있을 때 체크포인트 내부 메타데이터로 원본 모델명을 추출합니다.
+
+    우선순위:
+    1) ckpt['train_args']['model']      (가장 명확)
+    2) ckpt['model' or 'ema'].args['model']
+    3) ckpt['model' or 'ema'].yaml['yaml_file' 또는 'name']
+    4) 실패 시 현재 파일명(best 등) fallback
+    """
+    # 모델 파일이 없으면 fallback 이름 반환
+    if not model_path or not os.path.exists(model_path):
+        return "best"
+
+    source_name = None
+    try:
+        # PyTorch 2.6+는 weights_only 기본값 변경 이슈가 있어 False 우선 시도
+        try:
+            ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+        except TypeError:
+            ckpt = torch.load(model_path, map_location="cpu")
+
+        if isinstance(ckpt, dict):
+            # 1순위: 학습 인자에 기록된 원본 모델 파일
+            train_args = ckpt.get("train_args")
+            if isinstance(train_args, dict):
+                source_name = train_args.get("model")
+
+            # 2순위: model/ema 객체 args의 model 항목
+            if not source_name:
+                for key in ("model", "ema"):
+                    obj = ckpt.get(key)
+                    args = getattr(obj, "args", None)
+                    if isinstance(args, dict) and args.get("model"):
+                        source_name = args["model"]
+                        break
+
+            # 3순위: yaml 메타 정보
+            if not source_name:
+                for key in ("model", "ema"):
+                    obj = ckpt.get(key)
+                    y = getattr(obj, "yaml", None)
+                    if isinstance(y, dict):
+                        source_name = y.get("yaml_file") or y.get("name")
+                        if source_name:
+                            break
+    except Exception as e:
+        # 모델명 추출 실패는 추론 중단 사유가 아니므로 fallback 처리
+        print(f"모델명 추출 실패(체크포인트 메타): {e}")
+
+    # source_name이 있으면 경로/확장자를 제거해 순수 모델명만 사용
+    if source_name:
+        model_stem = os.path.splitext(os.path.basename(str(source_name)))[0]
+        return _sanitize_filename_part(model_stem)
+
+    # 메타 추출 실패 시 현재 모델 파일명(best 등) 사용
+    return _sanitize_filename_part(os.path.splitext(os.path.basename(model_path))[0])
+
+
+def create_submission_csv(image_dir, output_path=None, model_path=None, conf = config.conf_threshold_submission):
     """
     제출용 CSV 파일을 생성합니다.
     
@@ -206,34 +385,53 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
         str: 생성된 CSV 파일 경로
     """
     # 저장 경로 설정
+    # - 파일명은 항상 submission_날짜_시간 형식으로 생성
+    # - output_path가 파일 경로로 들어와도 해당 폴더 위치만 사용
+    # 파일명 시간은 시/분까지만 사용 (예: 22시 40분 -> 2240)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
     if output_path is None:
-        output_path = config.submission_csv_path
+        output_dir = os.path.dirname(config.submission_csv_path)
+    else:
+        output_dir = output_path if os.path.isdir(output_path) else os.path.dirname(output_path)
+
+    if not output_dir:
+        output_dir = "."
+
+    # 1) 실제 사용할 모델 경로를 먼저 확정
+    model_path = resolve_model_path(model_path)
+    # 2) best.pt 내부 메타데이터로 모델명을 추출
+    model_name = _extract_model_name_from_best_pt(model_path)
+
+    # 제출 산출물 파일명: submission_날짜_시간_모델명
+    output_path = os.path.join(output_dir, f"submission_{timestamp}_{model_name}.csv")
+    log_path = os.path.join(output_dir, f"submission_{timestamp}_{model_name}_data.log")
     
     # 출력 디렉토리 생성
     os.makedirs(os.path.dirname(output_path), exist_ok=True)        # 파일이 저장될 폴더가 있는지 확인 후 없으면 생성
     
-    # 모델 로드 (학습된 모델 우선 사용)
-    if model_path is None and os.path.exists(config.trained_model_path):
-        model_path = config.trained_model_path
-    
+    # 확정된 모델 경로로 detector 생성
     detector = DrugDetector(model_path)
     
-    # 이미지 파일 찾기
-    extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-    image_files = []
-    for f in os.listdir(image_dir):         # 폴더를 확인해서 이미지 파일만 골라옴
-        ext = os.path.splitext(f)[1].lower()
-        if ext in extensions:
-            image_files.append(os.path.join(image_dir, f))
+    # 이미지 파일 찾기 (공통 함수 사용)
+    image_files = find_image_files(image_dir)
     
     if not image_files:
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return None
-    
+
+    # 요청사항: 추론 시작 시점에 best.pt에서 추출한 모델명을 터미널에 출력
+    print(f"제출 추론 시작 모델명: {model_name}")
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
-    
+    print(f"CSV 저장 파일명: {os.path.basename(output_path)}")
+    print(f"로그 저장 파일명: {os.path.basename(log_path)}")
+
+    # ClassID 매핑 로드 (별도 함수 사용)
+    class_id_map = load_class_id_map()
+
     ### 제출용 파일 작성
     annotation_id = 1  # 1번부터 시작해서 1씩 증가
+    per_image_times = []
+    success_images = 0
     
     with open(output_path, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
@@ -242,6 +440,7 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
         
         for idx, img_path in enumerate(image_files, 1):
             print(f"[{idx}/{len(image_files)}] 처리 중: {os.path.basename(img_path)}")
+            image_infer_start = time.time()
             
             try:
                 # 파일명에서 숫자ID만 추출
@@ -254,6 +453,10 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                 # 추론 진행
                 image = load_image(img_path)
                 results = detector.detect(image, conf = conf)   # 신뢰도 기준을 낮출 수 있게 설정하였으나 변경가능예정
+                image_infer_elapsed = time.time() - image_infer_start
+                if idx >=4:
+                    per_image_times.append((img_path, image_infer_elapsed))
+                success_images += 1
                        
                 for det in results:
                     x1, y1, x2, y2 = det['bbox']
@@ -263,10 +466,15 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                     bbox_w = x2 - x1    # 폭 = 오른쪽 - 왼쪽
                     bbox_h = y2 - y1    # 높이 = 아래쪽 - 위쪽
                     
+                    # [수정] ClassID에 없는 번호는 에러 없이 건너뛰기
+                    category_id = det['category_id']
+                    if category_id not in class_id_map:
+                        continue
+                        
                     writer.writerow([
                         annotation_id,      # 고유번호
                         image_id,           # 이미지 번호
-                        det['category_id'], # 약 종류 번호
+                        class_id_map[category_id], # 약 종류 번호 (안전하게 접근)
                         bbox_x,             # 왼쪽 x좌표
                         bbox_y,             # 위쪽 y좌표
                         bbox_w,             # 폭
@@ -274,14 +482,45 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = 0
                         f"{det['confidence']:.4f}"      # 점수는 소수점 4자리까지 표시
                     ])
                     annotation_id += 1          # 다음 줄을 위한 번호 하나 증가
-                continue
+                
             except Exception as e:
                 print(f"오류 발생 ({img_path}): {e}")
+                image_infer_elapsed = time.time() - image_infer_start
+                if idx >=4:
+                    per_image_times.append((img_path, image_infer_elapsed))
                 continue
-    
+
+
+    inference_elapsed = sum(t for _, t in per_image_times)  # 4번째부터의 시간 합계
+    inf_hours = int(inference_elapsed // 3600)
+    inf_minutes = int((inference_elapsed % 3600) // 60)
+    inf_seconds = int(inference_elapsed % 60)
+    avg_inference_elapsed = (
+        sum(t for _, t in per_image_times) / len(per_image_times) if per_image_times else 0.0
+    )
+
+    # 제출 추론 시간 로그 저장
+    with open(log_path, "w", encoding="utf-8") as log_file:
+        # 요청사항: 제출 로그 최상단에 모델명 기록
+        log_file.write(f"model_name: {model_name}\n")
+        log_file.write("submission inference timing log\n")
+        log_file.write(f"created_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+        log_file.write(f"image_dir: {image_dir}\n")
+        log_file.write(f"total_images: {len(image_files)}\n")
+        log_file.write(f"successful_images: {success_images}\n")
+        log_file.write("-" * 60 + "\n")
+        for idx, (img_path, elapsed) in enumerate(per_image_times, 1):
+            log_file.write(f"{idx:04d}. {os.path.basename(img_path)}: {elapsed:.4f} sec\n")
+        log_file.write("-" * 60 + "\n")
+        log_file.write(f"total_inference_time_sec: {inference_elapsed:.4f}\n")
+        log_file.write(f"avg_inference_time_per_image_sec: {avg_inference_elapsed:.4f}\n")
+
+    print(f"\n총 추론 소요 시간: {inf_hours}시간 {inf_minutes}분 {inf_seconds}초 (총 {inference_elapsed:.2f}초)")
+    print(f"이미지 평균 추론 시간: {avg_inference_elapsed:.4f}초")
     print(f"\n제출용 CSV 생성 완료!")
     print(f"- 총 annotation 수: {annotation_id - 1}개")
     print(f"- 저장 위치: {output_path}")
+    print(f"- 추론 로그 저장 위치: {log_path}")
     
     return output_path
 
@@ -357,7 +596,7 @@ if __name__ == "__main__":
                 for class_name, info in summary.items():
                     print(f"  - {class_name}: {info['count']}개 (평균 신뢰도: {info['avg_confidence']:.2%})")
         else:
-            print(f"이미지를 찾을 수 없습니다: {image_path}")
+                print(f"이미지를 찾을 수 없습니다: {image_path}")
         
     elif args.mode == 'batch':
         # 배치 추론(폴더 자체로)
@@ -378,3 +617,5 @@ if __name__ == "__main__":
             create_submission_csv(image_dir, output_path, model_path=args.model)
         else:
             print(f"디렉토리를 찾을 수 없습니다: {image_dir}")
+
+### 서브미션 생성 터미널 명령어: " python src/model/yolo/yolo_predict.py --mode submission " ###

@@ -1,3 +1,6 @@
+# validation 평가 - mAP@0.5 계산
+# 클래스별 AP 구해서 평균 내는 방식
+
 import torch
 from torchvision.ops import box_iou
 

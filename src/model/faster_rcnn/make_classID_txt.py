@@ -1,3 +1,6 @@
+# annotation json에서 category id 추출해서 1부터 매핑하는 txt 생성
+# Faster R-CNN은 0이 background라서 1부터 시작해야 함
+
 import os
 import glob
 import json as json_json

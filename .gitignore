@@ -1,4 +1,23 @@
+# 설정 
 *.env
+
+# 데이터
 data/original/
 data/processed/
+data/yolo_dataset/
+
+# 캐시
 .idea/
+.vscode/
+.DS_Store
+__pycache__/
+*.pyc
+*.pt
+condaenv*.txt
+
+# 산출물
+results/*
+!results/submission/
+results/submission/*
+!results/submission/.gitkeep
+!results/submission/submission.csv

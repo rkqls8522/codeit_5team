@@ -131,7 +131,7 @@
 - 학습/추론 스크립트: `src/model/yolo/yolo_train.py`, `src/model/yolo/yolo_predict.py`
 - 평가/분석: `src/model/yolo/` 하의 utility 스크립트들
 
-(참고) Faster R-CNN은 비교 모델로 개발되었으며, 재현 가이드는 [README_Faster_RCNN_v9_5fold.md](README_Faster_RCNN_v9_5fold.md)를 참조하세요.
+(참고) Faster R-CNN은 비교 모델로 개발되었습니다.
 
 ---
 

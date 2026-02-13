@@ -1,26 +1,79 @@
+# 추론 + Kaggle CSV 생성
+# Soft-NMS 적용해서 겹치는 박스 처리하고 제출용 csv 만듦
+
 import os
 import csv
 import torch
-import torchvision.transforms.v2.functional as F
+import torchvision
 from Faster_RCNN_dataset import TestDataset, validation_transforms
 from Faster_RCNN_dataloader import test_build_dataloaders
+from config import CONFIG
 
-try:
-    from ensemble_boxes import weighted_boxes_fusion
-    HAS_WBF = True
-except ImportError:
-    HAS_WBF = False
-    print("[WARNING] ensemble_boxes 미설치. WBF 대신 NMS 사용. 설치: pip install ensemble_boxes")
+
+def soft_nms(boxes, scores, sigma=0.5, score_threshold=0.001):
+    """
+    Soft-NMS (Gaussian decay) — 논문: Bodla et al., ICCV 2017
+    Hard NMS 대비 +1.0~1.7 mAP 향상. 재학습 없이 추론만 바꾸면 됨.
+
+    겹치는 박스를 제거하지 않고, IoU에 따라 score를 부드럽게 감소시킴.
+    """
+    if len(boxes) == 0:
+        return boxes, scores
+
+    boxes = boxes.float()
+    scores = scores.float()
+
+    x1 = boxes[:, 0]
+    y1 = boxes[:, 1]
+    x2 = boxes[:, 2]
+    y2 = boxes[:, 3]
+    areas = (x2 - x1) * (y2 - y1)
+
+    order = scores.argsort(descending=True)
+    keep_boxes = []
+    keep_scores = []
+
+    while len(order) > 0:
+        i = order[0]
+        keep_boxes.append(boxes[i])
+        keep_scores.append(scores[i])
+
+        if len(order) == 1:
+            break
+
+        remaining = order[1:]
+
+        # IoU 계산
+        xx1 = torch.clamp(x1[remaining], min=x1[i].item())
+        yy1 = torch.clamp(y1[remaining], min=y1[i].item())
+        xx2 = torch.clamp(x2[remaining], max=x2[i].item())
+        yy2 = torch.clamp(y2[remaining], max=y2[i].item())
+
+        inter = torch.clamp(xx2 - xx1, min=0) * torch.clamp(yy2 - yy1, min=0)
+        union = areas[i] + areas[remaining] - inter
+        iou = inter / (union + 1e-6)
+
+        # Gaussian decay: score *= exp(-iou^2 / sigma)
+        decay = torch.exp(-(iou ** 2) / sigma)
+        scores[remaining] = scores[remaining] * decay
+
+        # threshold 이하 제거
+        mask = scores[remaining] >= score_threshold
+        order = remaining[mask]
+        # 다시 score 순으로 정렬
+        if len(order) > 0:
+            reorder = scores[order].argsort(descending=True)
+            order = order[reorder]
+
+    if len(keep_boxes) == 0:
+        return torch.zeros((0, 4)), torch.zeros((0,))
+
+    return torch.stack(keep_boxes), torch.stack(keep_scores)
 
 
 @torch.no_grad()
 def predict(model, image, device, score_threshold=0.5):
-    """
-    단일 이미지에 대해 예측 수행.
-
-    Returns:
-        boxes, labels, scores (confidence threshold 이상만)
-    """
+    """단일 이미지에 대해 예측 수행."""
     model.eval()
     image = image.to(device)
     output = model([image])[0]
@@ -33,90 +86,48 @@ def predict(model, image, device, score_threshold=0.5):
     }
 
 
-@torch.no_grad()
-def predict_tta(model, image, device):
-    """
-    TTA: 원본 + 좌우반전으로 2회 추론 후 결과를 합친다.
-    WBF가 설치되어 있으면 WBF로 박스를 합치고, 없으면 단순 concat 후 NMS를 적용한다.
+def apply_nms(boxes, labels, scores, config):
+    """NMS 또는 Soft-NMS 적용. 클래스별로 처리."""
+    use_soft = config.get('use_soft_nms', False)
+    sigma = config.get('soft_nms_sigma', 0.5)
+    nms_threshold = config.get('nms_threshold', 0.5)
 
-    Returns:
-        boxes [N,4] (x1,y1,x2,y2), labels [N], scores [N]
-    """
-    model.eval()
-    img_h, img_w = image.shape[-2], image.shape[-1]
+    if len(boxes) == 0:
+        return boxes, labels, scores
 
-    # --- 원본 추론 ---
-    img_orig = image.to(device)
-    out_orig = model([img_orig])[0]
+    unique_labels = labels.unique()
+    final_boxes = []
+    final_labels = []
+    final_scores = []
 
-    # --- 좌우반전 추론 ---
-    img_flip = F.horizontal_flip(image).to(device)
-    out_flip = model([img_flip])[0]
+    for label in unique_labels:
+        mask = labels == label
+        label_boxes = boxes[mask]
+        label_scores = scores[mask]
 
-    # 좌우반전 박스를 원본 좌표로 되돌리기: x1' = w - x2, x2' = w - x1
-    flip_boxes = out_flip['boxes'].cpu().clone()
-    x1 = flip_boxes[:, 0].clone()
-    x2 = flip_boxes[:, 2].clone()
-    flip_boxes[:, 0] = img_w - x2
-    flip_boxes[:, 2] = img_w - x1
+        if use_soft:
+            kept_boxes, kept_scores = soft_nms(label_boxes, label_scores, sigma=sigma)
+        else:
+            keep = torchvision.ops.nms(label_boxes, label_scores, iou_threshold=nms_threshold)
+            kept_boxes = label_boxes[keep]
+            kept_scores = label_scores[keep]
 
-    orig_boxes = out_orig['boxes'].cpu()
-    orig_scores = out_orig['scores'].cpu()
-    orig_labels = out_orig['labels'].cpu()
-    flip_scores = out_flip['scores'].cpu()
-    flip_labels = out_flip['labels'].cpu()
+        final_boxes.append(kept_boxes)
+        final_labels.append(torch.full((len(kept_boxes),), label.item(), dtype=torch.int64))
+        final_scores.append(kept_scores)
 
-    if HAS_WBF:
-        # WBF: 박스를 0~1로 정규화해야 함
-        def normalize_boxes(boxes, w, h):
-            normed = boxes.clone().float()
-            normed[:, 0] /= w
-            normed[:, 1] /= h
-            normed[:, 2] /= w
-            normed[:, 3] /= h
-            return normed.clamp(0, 1)
+    if len(final_boxes) == 0:
+        return torch.zeros((0, 4)), torch.zeros((0,), dtype=torch.int64), torch.zeros((0,))
 
-        boxes_list = [
-            normalize_boxes(orig_boxes, img_w, img_h).numpy(),
-            normalize_boxes(flip_boxes, img_w, img_h).numpy(),
-        ]
-        scores_list = [orig_scores.numpy(), flip_scores.numpy()]
-        labels_list = [orig_labels.numpy(), flip_labels.numpy()]
-
-        fused_boxes, fused_scores, fused_labels = weighted_boxes_fusion(
-            boxes_list, scores_list, labels_list,
-            iou_thr=0.5, skip_box_thr=0.01
-        )
-
-        # 0~1 → 원본 좌표로 복원
-        fused_boxes[:, 0] *= img_w
-        fused_boxes[:, 1] *= img_h
-        fused_boxes[:, 2] *= img_w
-        fused_boxes[:, 3] *= img_h
-
-        return (
-            torch.tensor(fused_boxes, dtype=torch.float32),
-            torch.tensor(fused_labels, dtype=torch.int64),
-            torch.tensor(fused_scores, dtype=torch.float32),
-        )
-    else:
-        # WBF 없으면 단순 concat + torchvision NMS
-        all_boxes = torch.cat([orig_boxes, flip_boxes], dim=0)
-        all_scores = torch.cat([orig_scores, flip_scores], dim=0)
-        all_labels = torch.cat([orig_labels, flip_labels], dim=0)
-
-        keep = torchvision.ops.nms(all_boxes, all_scores, iou_threshold=0.5)
-        return all_boxes[keep], all_labels[keep], all_scores[keep]
+    return torch.cat(final_boxes), torch.cat(final_labels), torch.cat(final_scores)
 
 
 @torch.no_grad()
 def generate_csv(model, test_img_dir, device, cat_id_map, output_path='submission.csv',
-                 score_threshold=0.3, batch_size=4, use_tta=False):
+                 score_threshold=0.3, batch_size=4):
     """
     test 이미지 전체를 추론하여 Kaggle 제출용 CSV를 생성한다.
-
-    Args:
-        use_tta: True면 TTA+WBF 적용, False면 기존 방식
+    Soft-NMS가 config에서 켜져 있으면 자동 적용.
 
     Kaggle 형식: annotation_id, image_id, category_id, bbox_x, bbox_y, bbox_w, bbox_h, score
     """
@@ -125,28 +136,40 @@ def generate_csv(model, test_img_dir, device, cat_id_map, output_path='submissio
 
     # 테스트 데이터셋 로드
     test_dataset = TestDataset(img_dir=test_img_dir, transforms=validation_transforms)
+    test_loader = test_build_dataloaders(test_dataset, batch_size=batch_size)
+
+    use_soft = CONFIG.get('use_soft_nms', False)
+    print(f"[추론] NMS: {'Soft-NMS (sigma={})'.format(CONFIG.get('soft_nms_sigma', 0.5)) if use_soft else 'Hard NMS'}")
 
     model.eval()
     rows = []
     annotation_id = 1
+    img_idx = 0
 
-    if use_tta:
-        print(f"[TTA+{'WBF' if HAS_WBF else 'NMS'}] 추론 시작 (이미지 {len(test_dataset)}장)")
-        # TTA는 이미지 1장씩 처리
-        for img_idx in range(len(test_dataset)):
-            image = test_dataset[img_idx]
+    for images in test_loader:
+        images_gpu = [img.to(device) for img in images]
+        outputs = model(images_gpu)
+
+        for output in outputs:
             img_path = test_dataset.img_p_list[img_idx]
             image_id = os.path.splitext(os.path.basename(img_path))[0]
 
-            boxes, labels, scores = predict_tta(model, image, device)
+            boxes = output['boxes'].cpu()
+            labels = output['labels'].cpu()
+            scores = output['scores'].cpu()
 
+            # Score threshold 적용
             keep = scores >= score_threshold
             boxes = boxes[keep]
             labels = labels[keep]
             scores = scores[keep]
 
+            # Soft-NMS 또는 Hard NMS 적용
+            if use_soft and len(boxes) > 0:
+                boxes, labels, scores = apply_nms(boxes, labels, scores, CONFIG)
+
             for box, label, score in zip(boxes, labels, scores):
-                original_id = reverse_map.get(int(label.item()), int(label.item()))
+                original_id = reverse_map.get(label.item(), label.item())
                 x1, y1, x2, y2 = box.tolist()
                 rows.append({
                     'annotation_id': annotation_id,
@@ -156,49 +179,11 @@ def generate_csv(model, test_img_dir, device, cat_id_map, output_path='submissio
                     'bbox_y': round(y1, 1),
                     'bbox_w': round(x2 - x1, 1),
                     'bbox_h': round(y2 - y1, 1),
-                    'score': round(float(score), 4),
+                    'score': round(score.item(), 4),
                 })
                 annotation_id += 1
 
-            if (img_idx + 1) % 100 == 0:
-                print(f"  {img_idx + 1}/{len(test_dataset)}장 완료")
-    else:
-        # 기존 방식 (배치 처리)
-        test_loader = test_build_dataloaders(test_dataset, batch_size=batch_size)
-        img_idx = 0
-        for images in test_loader:
-            images_gpu = [img.to(device) for img in images]
-            outputs = model(images_gpu)
-
-            for output in outputs:
-                img_path = test_dataset.img_p_list[img_idx]
-                image_id = os.path.splitext(os.path.basename(img_path))[0]
-
-                boxes = output['boxes'].cpu()
-                labels = output['labels'].cpu()
-                scores = output['scores'].cpu()
-
-                keep = scores >= score_threshold
-                boxes = boxes[keep]
-                labels = labels[keep]
-                scores = scores[keep]
-
-                for box, label, score in zip(boxes, labels, scores):
-                    original_id = reverse_map.get(label.item(), label.item())
-                    x1, y1, x2, y2 = box.tolist()
-                    rows.append({
-                        'annotation_id': annotation_id,
-                        'image_id': image_id,
-                        'category_id': original_id,
-                        'bbox_x': round(x1, 1),
-                        'bbox_y': round(y1, 1),
-                        'bbox_w': round(x2 - x1, 1),
-                        'bbox_h': round(y2 - y1, 1),
-                        'score': round(score.item(), 4),
-                    })
-                    annotation_id += 1
-
-                img_idx += 1
+            img_idx += 1
 
     # CSV 저장
     fieldnames = ['annotation_id', 'image_id', 'category_id', 'bbox_x', 'bbox_y', 'bbox_w', 'bbox_h', 'score']
@@ -207,6 +192,5 @@ def generate_csv(model, test_img_dir, device, cat_id_map, output_path='submissio
         writer.writeheader()
         writer.writerows(rows)
 
-    img_count = len(test_dataset) if use_tta else img_idx
-    print(f"CSV 저장 완료: {output_path} (이미지 {img_count}장, 객체 {len(rows)}개)")
+    print(f"CSV 저장 완료: {output_path} (이미지 {img_idx}장, 객체 {len(rows)}개)")
     return output_path

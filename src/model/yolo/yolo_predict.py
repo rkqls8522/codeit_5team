@@ -15,6 +15,7 @@ import csv
 import re
 import cv2
 import ast  
+import torch
 
 from datetime import datetime
 import time
@@ -193,7 +194,7 @@ def predict_batch(image_dir, output_dir=None, extensions=None, model_path=None):
     
     # 모델 로드 (공통 우선순위 로직 사용)
     model_path = resolve_model_path(model_path)
-    
+
     detector = DrugDetector(model_path)
     
     # 이미지 파일 목록 가져오기 (공통 함수 사용)
@@ -296,6 +297,79 @@ def save_results_to_csv(results, csv_path, image_path=None):
             ])
 
 ### 제출용 CSV 생성
+def _sanitize_filename_part(value):
+    """
+    파일명에 쓸 수 없는 문자를 안전한 문자(_)로 치환합니다.
+    - 모델명이 경로 형태(`/path/to/yolov8l.pt`)일 수 있어 basename/확장자 처리 전에 정리 필요
+    - Windows 금지문자: \\ / : * ? " < > |
+    """
+    if not value:
+        return "model"
+
+    # 파일 시스템에서 허용하지 않는 문자들을 '_'로 치환
+    cleaned = re.sub(r'[\\/:*?"<>|]+', "_", str(value)).strip()
+    return cleaned or "model"
+
+
+def _extract_model_name_from_best_pt(model_path):
+    """
+    best.pt 파일 하나만 있을 때 체크포인트 내부 메타데이터로 원본 모델명을 추출합니다.
+
+    우선순위:
+    1) ckpt['train_args']['model']      (가장 명확)
+    2) ckpt['model' or 'ema'].args['model']
+    3) ckpt['model' or 'ema'].yaml['yaml_file' 또는 'name']
+    4) 실패 시 현재 파일명(best 등) fallback
+    """
+    # 모델 파일이 없으면 fallback 이름 반환
+    if not model_path or not os.path.exists(model_path):
+        return "best"
+
+    source_name = None
+    try:
+        # PyTorch 2.6+는 weights_only 기본값 변경 이슈가 있어 False 우선 시도
+        try:
+            ckpt = torch.load(model_path, map_location="cpu", weights_only=False)
+        except TypeError:
+            ckpt = torch.load(model_path, map_location="cpu")
+
+        if isinstance(ckpt, dict):
+            # 1순위: 학습 인자에 기록된 원본 모델 파일
+            train_args = ckpt.get("train_args")
+            if isinstance(train_args, dict):
+                source_name = train_args.get("model")
+
+            # 2순위: model/ema 객체 args의 model 항목
+            if not source_name:
+                for key in ("model", "ema"):
+                    obj = ckpt.get(key)
+                    args = getattr(obj, "args", None)
+                    if isinstance(args, dict) and args.get("model"):
+                        source_name = args["model"]
+                        break
+
+            # 3순위: yaml 메타 정보
+            if not source_name:
+                for key in ("model", "ema"):
+                    obj = ckpt.get(key)
+                    y = getattr(obj, "yaml", None)
+                    if isinstance(y, dict):
+                        source_name = y.get("yaml_file") or y.get("name")
+                        if source_name:
+                            break
+    except Exception as e:
+        # 모델명 추출 실패는 추론 중단 사유가 아니므로 fallback 처리
+        print(f"모델명 추출 실패(체크포인트 메타): {e}")
+
+    # source_name이 있으면 경로/확장자를 제거해 순수 모델명만 사용
+    if source_name:
+        model_stem = os.path.splitext(os.path.basename(str(source_name)))[0]
+        return _sanitize_filename_part(model_stem)
+
+    # 메타 추출 실패 시 현재 모델 파일명(best 등) 사용
+    return _sanitize_filename_part(os.path.splitext(os.path.basename(model_path))[0])
+
+
 def create_submission_csv(image_dir, output_path=None, model_path=None, conf = config.conf_threshold_submission):
     """
     제출용 CSV 파일을 생성합니다.
@@ -323,15 +397,19 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
     if not output_dir:
         output_dir = "."
 
-    output_path = os.path.join(output_dir, f"submission_{timestamp}.csv")
-    log_path = os.path.join(output_dir, f"submission_{timestamp}_data.log")
+    # 1) 실제 사용할 모델 경로를 먼저 확정
+    model_path = resolve_model_path(model_path)
+    # 2) best.pt 내부 메타데이터로 모델명을 추출
+    model_name = _extract_model_name_from_best_pt(model_path)
+
+    # 제출 산출물 파일명: submission_날짜_시간_모델명
+    output_path = os.path.join(output_dir, f"submission_{timestamp}_{model_name}.csv")
+    log_path = os.path.join(output_dir, f"submission_{timestamp}_{model_name}_data.log")
     
     # 출력 디렉토리 생성
     os.makedirs(os.path.dirname(output_path), exist_ok=True)        # 파일이 저장될 폴더가 있는지 확인 후 없으면 생성
     
-    # 모델 로드 (공통 우선순위 로직 사용)
-    model_path = resolve_model_path(model_path)
-    
+    # 확정된 모델 경로로 detector 생성
     detector = DrugDetector(model_path)
     
     # 이미지 파일 찾기 (공통 함수 사용)
@@ -341,6 +419,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
         print(f"경고: {image_dir}에서 이미지를 찾을 수 없습니다.")
         return None
 
+    # 요청사항: 추론 시작 시점에 best.pt에서 추출한 모델명을 터미널에 출력
+    print(f"제출 추론 시작 모델명: {model_name}")
     print(f"총 {len(image_files)}개 이미지에 대해 제출용 CSV 생성 중...")
     print(f"CSV 저장 파일명: {os.path.basename(output_path)}")
     print(f"로그 저장 파일명: {os.path.basename(log_path)}")
@@ -421,6 +501,8 @@ def create_submission_csv(image_dir, output_path=None, model_path=None, conf = c
 
     # 제출 추론 시간 로그 저장
     with open(log_path, "w", encoding="utf-8") as log_file:
+        # 요청사항: 제출 로그 최상단에 모델명 기록
+        log_file.write(f"model_name: {model_name}\n")
         log_file.write("submission inference timing log\n")
         log_file.write(f"created_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         log_file.write(f"image_dir: {image_dir}\n")

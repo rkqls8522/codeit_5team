@@ -24,7 +24,8 @@ results/*
 results/submission/*
 !results/submission/.gitkeep
 !results/yolo_train_20260209_12_24/
-!results/yolo_train_20260209_12_24/weights/
+!results/yolo_train_20260209_12_24/weights/best.pt
+!results/yolo_train_20260209_12_24/weights/last.pt
 !results/submission/submission_yolov8m_epoch100.csv
 !results/submission/submission_20260212_1321_yolov8m_data.log
 !results/README.md

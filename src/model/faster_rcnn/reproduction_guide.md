@@ -16,7 +16,7 @@ albumentations >= 1.3
 opencv-python
 numpy
 scikit-learn
-ensemble-boxes   # WBF 앙상블용
+ensemble-boxes >= 1.0   # WBF 앙상블용
 ```
 
 ### 설치
@@ -78,7 +78,7 @@ python main.py
 ### 방법 B: Google Colab 실행 (권장)
 
 1. `train_5fold_colab.ipynb`를 Colab에 업로드
-2. 데이터를 Google Drive에 업로드 (`/content/drive/MyDrive/Opal/codeit_5team/`)
+2. 데이터를 Google Drive에 업로드 (노트북 내 경로를 본인 Drive 경로에 맞게 수정)
 3. GPU 런타임 선택 (T4 또는 A100)
 4. 노트북 셀 순서대로 실행
 
@@ -93,15 +93,21 @@ python train_v9_5fold.py
 ```
 
 - 232장을 5개 Fold로 분할하여 각각 30 epoch 학습
-- 체크포인트 5개 생성 (`fold_1_best.pth` ~ `fold_5_best.pth`)
+- 체크포인트 5개 생성: `checkpoints/fold_1_best.pth` ~ `checkpoints/fold_5_best.pth`
 
 ### 5.2 추론 (WBF 앙상블)
 ```bash
 python predict_v9_5fold_wbf.py
 ```
 
+- `checkpoints/` 폴더에서 5개 체크포인트를 불러와 각각 추론
 - 5개 모델의 예측을 WBF (iou_threshold=0.55)로 가중 평균
 - `submission.csv` 생성 (Kaggle 제출 형식)
+
+```
+annotation_id,image_id,category_id,bbox_x,bbox_y,bbox_w,bbox_h,score
+1,test_001,12,150.3,200.1,80.5,60.2,0.9521
+```
 
 ---
 
@@ -134,10 +140,14 @@ python predict_v9_5fold_wbf.py
 
 | 버전 | Kaggle mAP | 주요 변경 |
 |------|-----------|----------|
-| v1 | 0.360 | 초기 모델 |
-| v2 | 0.691 | score threshold 0.05 |
+| v1 | 0.360 | 초기 모델, score threshold 0.5 |
+| v2 | 0.691 | score threshold 0.5 → 0.05 |
+| v3 | 0.580 | 학습률 변경 실험 (하락) |
 | v4 | 0.692 | ResNet50v2 + Albumentations |
-| v8 | 0.090 | Mosaic + 차등 LR (실패) |
+| v5 | 0.620 | 하이퍼파라미터 탐색 (하락) |
+| v6 | 0.690 | CosineAnnealing 스케줄러 |
+| v7 | 0.360 | Custom Anchor 시도 (폭락) |
+| v8 | 0.090 | Mosaic + 차등 LR (최악) |
 | v8_opt | 0.915 | 잘못된 것 제거 + AdamW + Soft-NMS |
 | **v9** | **0.931** | **5-Fold CV + WBF 앙상블 (최종)** |
 | v10 | 0.900 | TTA 시도 (하락) |

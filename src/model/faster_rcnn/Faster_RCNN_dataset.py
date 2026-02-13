@@ -30,12 +30,12 @@ target['area']: 각 박스의 넓이 ((x2-x1) * (y2-y1)),
 target['iscrowd']: 전부 0으로 채우면 됩니다
 """
 
-###     Mosaic Augmentation (소규모 데이터 핵심 — YOLO에서 검증된 +3~5 mAP)
+###     Mosaic Augmentation (실험 결과: 232장/57클래스에서는 class collapse 발생하여 사용 안 함)
 def mosaic_augmentation(dataset, idx, img_size=(1280, 976)):
     """
     4장의 이미지를 하나로 합치는 Mosaic augmentation.
-    소규모 데이터(232장)에서 가장 효과적인 augmentation.
-    이미지 4장을 2x2 그리드로 합쳐서 다양한 객체 조합을 학습.
+    대규모 데이터(COCO 등)에서는 효과적이나, 소규모(232장)+다클래스(57)에서는
+    class collapse가 발생하여 v8 이후 use_mosaic=False로 비활성화.
     """
     w, h = img_size
     # 중심점을 랜덤으로 설정 (이미지의 25%~75% 범위)
@@ -101,55 +101,40 @@ def mosaic_augmentation(dataset, idx, img_size=(1280, 976)):
     return mosaic_img, all_boxes, all_labels
 
 
-###     강력한 Albumentations 기반 augmentation (v8)
+###     Albumentations 기반 augmentation (v9 최종)
 def get_training_transforms_albu():
-    """YOLO 수준의 강력한 augmentation - mAP 10~20% 향상 기대"""
+    """학습용 augmentation. A.Normalize 사용 금지 (torchvision 내부 정규화와 충돌)."""
     return A.Compose([
-        # 1. 기하학적 변환
         A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.3),
-        A.RandomRotate90(p=0.3),
         A.ShiftScaleRotate(
-            shift_limit=0.1,
-            scale_limit=0.2,
-            rotate_limit=15,
+            shift_limit=0.05,
+            scale_limit=0.1,
+            rotate_limit=10,
             border_mode=0,
-            p=0.5
+            p=0.4,
         ),
-
-        # 2. 색상 변환 (약 이미지 특성 고려 - 색상이 중요)
+        A.RandomBrightnessContrast(
+            brightness_limit=0.15, contrast_limit=0.15, p=0.5
+        ),
+        A.HueSaturationValue(
+            hue_shift_limit=8, sat_shift_limit=15, val_shift_limit=15, p=0.3
+        ),
         A.OneOf([
-            A.RandomBrightnessContrast(brightness_limit=0.2, contrast_limit=0.2, p=1.0),
-            A.HueSaturationValue(hue_shift_limit=10, sat_shift_limit=20, val_shift_limit=20, p=1.0),
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, p=1.0),
-        ], p=0.7),
-
-        # 3. 노이즈 & 블러 (현실 환경 시뮬레이션)
-        A.OneOf([
-            A.GaussNoise(var_limit=(10.0, 50.0), p=1.0),
             A.GaussianBlur(blur_limit=(3, 5), p=1.0),
-            A.MotionBlur(blur_limit=5, p=1.0),
-        ], p=0.3),
-
-        # 4. 이미지 품질 변환
-        A.OneOf([
-            A.ImageCompression(quality_lower=80, quality_upper=100, p=1.0),
-            A.Sharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), p=1.0),
-        ], p=0.2),
-
-        # 5. 정규화 + Tensor 변환
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            A.MotionBlur(blur_limit=3, p=1.0),
+        ], p=0.15),
+        A.ToFloat(max_value=255.0),
         ToTensorV2(),
     ], bbox_params=A.BboxParams(
-        format='pascal_voc',  # [x1, y1, x2, y2]
+        format='pascal_voc',
         label_fields=['labels'],
-        min_visibility=0.3,  # 30% 이상 보이는 박스만 유지
+        min_visibility=0.3,
     ))
 
 def get_validation_transforms_albu():
-    """Validation용 - augmentation 없이 정규화만"""
+    """Validation용 - augmentation 없이 [0,1] 정규화 + Tensor 변환만"""
     return A.Compose([
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        A.ToFloat(max_value=255.0),
         ToTensorV2(),
     ], bbox_params=A.BboxParams(
         format='pascal_voc',
@@ -359,8 +344,8 @@ class TestDataset(Dataset):
 
 
 def get_test_transforms_albu():
-    """Test용 - 정규화만 (bbox 없음)"""
+    """Test용 - [0,1] 정규화 + Tensor 변환만 (bbox 없음)"""
     return A.Compose([
-        A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        A.ToFloat(max_value=255.0),
         ToTensorV2(),
     ])

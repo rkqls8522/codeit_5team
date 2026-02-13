@@ -251,3 +251,7 @@ python src/model/yolo/yolo_predict.py --mode submission
 - 정주희 : https://www.notion.so/2f7f3d707ce880fb91a2c7f4ae455074?source=copy_link
 - 박수성 : https://docs.google.com/document/d/1Hf6h7Vu_1eF07uzN-lPkGGjWrmwsw9-ftvhKOtmLd8o/edit?usp=sharing
 - 강하은 : https://www.notion.so/2f7ba7f4895a80e589ebcf4898290296?source=copy_link
+
+[보고서 다운로드](https://github.com/rkqls8522/codeit_5team/raw/main/docs/%ED%97%AC%EC%8A%A4%EC%9E%875%ED%8C%80%20-%20%EC%95%8C%EC%95%BD%20%EB%B6%84%EB%A5%98%20%EB%AA%A8%EB%8D%B8%20%EA%B0%9C%EB%B0%9C%20%EB%B3%B4%EA%B3%A0%EC%84%9C.pdf)
+
+

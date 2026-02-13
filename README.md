@@ -82,7 +82,6 @@
  ┃   ┗ 📂faster_rcnn            # Faster R-CNN 학습/평가/예측 코드
  ┣ 📜.gitignore
  ┣ 📜README.md                  # 프로젝트 설명
- ┗ 📜README_Faster_RCNN_v9_5fold.md  # Faster R-CNN 재현 가이드
 ```
 
 ---

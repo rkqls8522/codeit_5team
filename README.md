@@ -167,9 +167,9 @@
    - `src/model/yolo/yolo_predict.py` → `create_submission_csv()` 실행 후 로그 파일 기록
    - 로그 파일: `results/submission/submission_{timestamp}_data.log`
 
-3. **FPS (참고용)**
+3. **FPS**
    - 계산: `fps ≈ 1 / 평균 추론 시간`
-   - ⚠️ **주의**: 이 값은 참고용입니다. 실제 배포 환경에서는 배치 처리, GPU 워밍업 등을 고려하여 재측정 필요합니다.
+   - **주의**: 이 값은 참고용입니다. 실제 배포 환경에서는 배치 처리, GPU 워밍업 등을 고려하여 재측정이 필요합니다.
 
 ---
 

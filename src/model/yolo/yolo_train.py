@@ -115,14 +115,14 @@ def train(resume=False):
     print(f"학습 시작 시각: {time.strftime('%Y-%m-%d %H:%M:%S')}")
     
     model.train(data=config.data_yaml_path,     # ← config에서 가져오기
-                epochs=50,
-                imgsz=640,
+                epochs=100,
+                imgsz=1024,
                 device=config.device,
                 batch=10,
-                patience=10,
+                patience=20,
                 project=config.TRAIN_RESULT_DIR,
                 name=run_name,
-                exist_ok=True,                  
+                exist_ok=False,                  
                 resume=resume)
     
     # 학습 시간 측정 종료

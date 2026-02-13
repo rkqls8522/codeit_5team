@@ -2,7 +2,10 @@
 *.env
 
 # 데이터
-data/original/
+data/original/*
+!data/original/
+!data/original/.gitkeep
+
 data/processed/
 data/yolo_dataset/
 
@@ -20,4 +23,8 @@ results/*
 !results/submission/
 results/submission/*
 !results/submission/.gitkeep
-!results/submission/submission.csv
+!results/yolo_train_20260209_12_24/
+!results/yolo_train_20260209_12_24/weights/
+!results/submission/submission_yolov8m_epoch100.csv
+!results/submission/submission_20260212_1321_yolov8m_data.log
+!results/README.md

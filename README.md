@@ -190,7 +190,7 @@
 
 ## 1. 데이터 준비
 
-프로젝트 루트의 `data/data.zip` 파일을 `data/`위치에 압축 해제합니다.
+https://drive.google.com/drive/folders/16wokuICTlGxwMbB-XxW5qGtbvnROHfs3?usp=drive_link 에 있는 `data.zip` 파일을 다운로드하여 `data/original/`위치에 압축 해제합니다.
 
 ## 2. Conda 가상환경 생성 및 활성화
 
@@ -245,3 +245,10 @@ python src/model/yolo/yolo_predict.py --mode submission
 - 실험별 설정/로그: 각 `results/yolo_final_model*` 폴더의 `args.yaml`, `results.csv`
 
 ---
+
+# 협업 일지
+
+- 노가빈 : https://sordid-daffodil-392.notion.site/2f7989ffa6ed802a80e0d45f31beea96?source=copy_link
+- 정주희 : https://www.notion.so/2f7f3d707ce880fb91a2c7f4ae455074?source=copy_link
+- 박수성 : https://docs.google.com/document/d/1Hf6h7Vu_1eF07uzN-lPkGGjWrmwsw9-ftvhKOtmLd8o/edit?usp=sharing
+- 강하은 : https://www.notion.so/2f7ba7f4895a80e589ebcf4898290296?source=copy_link
